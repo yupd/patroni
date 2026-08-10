@@ -799,6 +799,11 @@ class ConfigHandler(object):
             self._auto_conf_mtime = auto_conf_mtime
             self._postmaster_ctime = postmaster_ctime
         except Exception as exc:
+            if isinstance(exc, PostgresConnectionException) and self._postgresql._naming.flavor == 'kingbase':
+                # Kingbase hot_standby=off 备库拒绝所有连接（license 限制），
+                # _get_pg_settings 必然失败。视为配置无变化，避免
+                # check_recovery_conf 返回 True 导致无限 restart 循环。
+                return None, False
             if all((isinstance(exc, PostgresConnectionException),
                     self._postgresql_conf_mtime == pg_conf_mtime,
                     self._auto_conf_mtime == auto_conf_mtime,

@@ -1139,7 +1139,12 @@ class Postgresql(ClusterSite):
                 row = cur.fetchone()
                 return row[1] if row else None
         except Exception:
-            logger.exception('Can not fetch local timeline and lsn from replication connection')
+            # Kingbase hot_standby=off 备库拒绝所有连接（含 replication 协议），
+            # timeline 查询失败是常态，降级为 debug 避免日志噪音
+            if self._naming.flavor == 'kingbase':
+                logger.debug('Kingbase: can not fetch local timeline (hot_standby=off rejects connections)')
+            else:
+                logger.exception('Can not fetch local timeline and lsn from replication connection')
 
     def replica_cached_timeline(self, primary_timeline: Optional[int]) -> Optional[int]:
         if not self._cached_replica_timeline or not primary_timeline\
