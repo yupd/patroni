@@ -602,6 +602,11 @@ class Rewind(object):
     def single_user_mode(self, communicate: Optional[Dict[str, Any]] = None,
                          options: Optional[Dict[str, str]] = None) -> Optional[int]:
         """run a given command in a single-user mode. If the command is empty - then just start and stop"""
+        # Kingbase doesn't support PG's --single flag. Skip single-user mode,
+        # crash recovery will happen automatically on normal start.
+        if self._postgresql._naming.flavor == 'kingbase':
+            logger.info('Kingbase: skipping single-user mode (not supported), relying on normal crash recovery')
+            return 0
         cmd = [self._postgresql.pgcommand('postgres'), '--single', '-D', self._postgresql.data_dir]
         for opt, val in sorted((options or {}).items()):
             cmd.extend(['-c', '{0}={1}'.format(opt, val)])

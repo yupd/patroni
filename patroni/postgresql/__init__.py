@@ -1012,7 +1012,12 @@ class Postgresql(ClusterSite):
         ready = self.pg_isready()
 
         if ready == PgIsReadyStatus.REJECT:
-            return False
+            # Kingbase: hot_standby=off 备库永远拒绝普通连接（license 不支持 hot_standby）。
+            # REJECT 表示 postmaster 在运行且拒绝连接 = 备库正常状态，视为运行中。
+            if self._naming.flavor == 'kingbase':
+                ready = PgIsReadyStatus.RUNNING
+            else:
+                return False
         elif ready == PgIsReadyStatus.NO_RESPONSE:
             ret = not self.is_running()
             if ret:

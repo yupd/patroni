@@ -367,7 +367,7 @@ class ConfigHandler(object):
         'port': (None, _false_validator, 90100),
         'cluster_name': (None, _false_validator, 90500),
         'wal_level': ('hot_standby', EnumValidator(('hot_standby', 'replica', 'logical')), 90100),
-        'hot_standby': ('on', _bool_is_true_validator, 90100),
+        'hot_standby': ('on', _bool_validator, 90100),
         'max_connections': (100, IntValidator(min=25), 90100),
         'max_wal_senders': (10, IntValidator(min=3), 90100),
         'wal_keep_segments': (8, IntValidator(min=1), 90100),
@@ -655,6 +655,11 @@ class ConfigHandler(object):
             ret['krbsrvname'] = self._krbsrvname
         if not ret.get('dbname'):
             ret['dbname'] = self._postgresql.database
+        # Kingbase libpq 不支持 passfile 参数（walsender 认证会失败），用密码直连
+        if self._postgresql._naming.flavor == 'kingbase':
+            ret.pop('passfile', None)
+            if self.replication.get('password'):
+                ret['password'] = self.replication['password']
         return ret
 
     def format_dsn(self, params: Dict[str, Any]) -> str:
@@ -690,7 +695,10 @@ class ConfigHandler(object):
                 recovery_params.setdefault('pause_at_recovery_target', 'false')
         for name, value in sorted(recovery_params.items()):
             if name == 'primary_conninfo':
-                if self._postgresql.major_version >= 100000 and 'PGPASSFILE' in self.write_pgpass(value):
+                if self._postgresql._naming.flavor == 'kingbase':
+                    # Kingbase libpq 不支持 passfile 参数，保留 password 直连
+                    value.pop('passfile', None)
+                elif self._postgresql.major_version >= 100000 and 'PGPASSFILE' in self.write_pgpass(value):
                     value['passfile'] = self._passfile = self._pgpass
                     self._passfile_mtime = mtime(self._pgpass)
                 value = self.format_dsn(value)

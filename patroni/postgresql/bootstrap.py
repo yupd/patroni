@@ -287,6 +287,10 @@ class Bootstrap(object):
             "-X", "stream",
             "-d", conn_url,
         ] + user_options
+        # Kingbase: 宿主磁盘 (LVM) fsync 极慢导致 basebackup 卡死。
+        # -N (no-sync) 秒级完成，克隆完整性由 WAL streaming 保证。
+        if self._postgresql._naming.flavor == 'kingbase' and '-N' not in cmd:
+            cmd.append('-N')
 
         for bbfailures in range(0, maxfailures):
             if self._postgresql.cancellable.is_cancelled:
