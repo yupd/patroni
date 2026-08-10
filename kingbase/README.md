@@ -40,4 +40,4 @@ docker save patroni-kingbase:latest -o patroni-kingbase.tar
 
 ## 集群部署
 
-将镜像分发到三节点（192.168.11.67/68/69），使用 `docker run` 部署 etcd + Patroni-Kingbase 容器，通过 `kingbase0.yml` 配置集群参数。
+将镜像分发到集群各节点，使用 `docker run` 部署 etcd + Patroni-Kingbase 容器，通过 `kingbase0.yml` 配置集群参数。
