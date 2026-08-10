@@ -6,10 +6,11 @@
 
 | 文件 | 用途 |
 |------|------|
-| `Dockerfile.patroni-kb` | CentOS 7 多阶段构建：从 `kingbase:v8.0` 提取 Kingbase 文件 + 安装 Patroni |
+| `Dockerfile.patroni-kb` | **生产用** — CentOS 7 多阶段构建：从 `kingbase:v8.0` 提取 Kingbase + 安装 Patroni + etcd + confd + haproxy |
 | `Dockerfile.kingbase` | 简化版构建（直接基于 `kingbase:v8.0`） |
 | `entrypoint_kb.sh` | 容器入口脚本（支持 etcd / Patroni / haproxy 三种模式） |
 | `kingbase0.yml` | Patroni 配置文件（`database_flavor: kingbase`） |
+| `haproxy_kb.cfg` | Kingbase 适配的 HAProxy 读写分离配置 |
 | `kingbase_dockerfile` | 原始 Kingbase 镜像 Dockerfile（参考用） |
 
 ## 核心适配：database_flavor
@@ -30,9 +31,6 @@ Patroni 代码适配的核心是 `patroni/postgresql/naming.py` 中的 `FlavorNa
 ## 构建镜像
 
 ```bash
-# 在构建服务器上（已配置 kingbase:v8.0 镜像）
-ssh -p52222 root@8.140.58.113
-
 cd /root/kingbase && \
 docker build -f Dockerfile.patroni-kb -t patroni-kingbase:latest .
 
@@ -42,4 +40,4 @@ docker save patroni-kingbase:latest -o patroni-kingbase.tar
 
 ## 集群部署
 
-将镜像分发到三节点后，使用 `deploy_kb_cluster_patroni.sh` 一键部署。
+将镜像分发到三节点（192.168.11.67/68/69），使用 `docker run` 部署 etcd + Patroni-Kingbase 容器，通过 `kingbase0.yml` 配置集群参数。
