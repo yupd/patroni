@@ -279,10 +279,9 @@ class Bootstrap(object):
             user_options = validated_options
         cmd = [
             self._postgresql.pgcommand("pg_basebackup"),
-            "--pgdata=" + self._postgresql.data_dir,
-            "-X",
-            "stream",
-            "--dbname=" + conn_url,
+            "-D", self._postgresql.data_dir,
+            "-X", "stream",
+            "-d", conn_url,
         ] + user_options
 
         for bbfailures in range(0, maxfailures):

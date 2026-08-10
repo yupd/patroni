@@ -1250,6 +1250,18 @@ def get_postgres_version(bin_dir: Optional[str] = None, bin_name: str = 'postgre
     except OSError as e:
         raise PatroniException(f'Failed to get postgres version: {e}')
     version = re.match(r'^[^\s]+ [^\s]+ ((\d+)(\.\d+)*)', version)
+    if version is None:
+        # Kingbase format: `KINGBASE (KingbaseES) V008R006C007M023B0013`
+        # or `sys_ctl (Kingbase) 12.1` — try sys_ctl as fallback
+        if bin_name != 'kingbase' and bin_dir:
+            sys_ctl_bin = os.path.join(bin_dir, 'sys_ctl')
+        else:
+            sys_ctl_bin = os.path.join(os.path.dirname(binary), 'sys_ctl') if '/' in binary else 'sys_ctl'
+        try:
+            ctl_version = subprocess.check_output([sys_ctl_bin, '--version']).decode()
+            version = re.match(r'^[^\s]+ [^\s]+ ((\d+)(\.\d+)*)', ctl_version)
+        except (OSError, subprocess.CalledProcessError):
+            pass
     if TYPE_CHECKING:  # pragma: no cover
         assert version is not None
     version = version.groups()  # e.g., ('15.2', '15', '.2')

@@ -75,7 +75,7 @@ class Postgresql(ClusterSite):
               "CASE WHEN pg_catalog.pg_is_in_recovery() THEN 0 ELSE "
               "pg_catalog.pg_{0}_{1}_diff(pg_catalog.pg_current_{0}{2}_{1}(), '0/0')::bigint END, "  # wal(_flush)?_lsn
               "pg_catalog.pg_{0}_{1}_diff(pg_catalog.pg_last_{0}_replay_{1}(), '0/0')::bigint, "
-              "pg_catalog.pg_{0}_{1}_diff(COALESCE(pg_catalog.pg_last_{0}_receive_{1}(), '0/0'), '0/0')::bigint, "
+              "pg_catalog.pg_{0}_{1}_diff(COALESCE(pg_catalog.pg_last_{0}_receive_{1}(), '0/0'::pg_lsn), '0/0'::pg_lsn)::bigint, "
               "pg_catalog.pg_is_in_recovery() AND pg_catalog.pg_is_{0}_replay_paused()")
 
     def __init__(self, config: Dict[str, Any], mpp: AbstractMPP) -> None:
