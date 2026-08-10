@@ -181,7 +181,11 @@ class Bootstrap(object):
             r = clone_member.conn_kwargs(self._postgresql.config.replication)
             # add the credentials to connect to the replica origin to pgpass.
             env = self._postgresql.config.write_pgpass(r)
-            connstring = self._postgresql.config.format_dsn({**r, 'password': None})
+            # Kingbase's sys_basebackup doesn't support PGPASSFILE, must include password in DSN
+            if self._postgresql._naming.flavor == 'kingbase':
+                connstring = self._postgresql.config.format_dsn(r)
+            else:
+                connstring = self._postgresql.config.format_dsn({**r, 'password': None})
         else:
             connstring = ''
             env = os.environ.copy()
