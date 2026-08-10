@@ -528,7 +528,10 @@ class Postgresql(ClusterSite):
                     raise
             except RetryFailedError as e:  # SELECT failed two times
                 self._cluster_info_state = {'error': str(e)}
-                if not self.is_starting() and self.pg_isready() == PgIsReadyStatus.REJECT:
+                # Kingbase hot_standby=off 备库永远 REJECT（license 限制），
+                # 监控查询失败是常态，不能据此把 state 降回 STARTING
+                if not self.is_starting() and self.pg_isready() == PgIsReadyStatus.REJECT \
+                        and self._naming.flavor != 'kingbase':
                     self.set_state(PostgresqlState.STARTING)
 
         if 'error' in self._cluster_info_state:
@@ -1011,13 +1014,8 @@ class Postgresql(ClusterSite):
         """
         ready = self.pg_isready()
 
-        if ready == PgIsReadyStatus.REJECT:
-            # Kingbase: hot_standby=off 备库永远拒绝普通连接（license 不支持 hot_standby）。
-            # REJECT 表示 postmaster 在运行且拒绝连接 = 备库正常状态，视为运行中。
-            if self._naming.flavor == 'kingbase':
-                ready = PgIsReadyStatus.RUNNING
-            else:
-                return False
+        if ready == PgIsReadyStatus.REJECT and self._naming.flavor != 'kingbase':
+            return False
         elif ready == PgIsReadyStatus.NO_RESPONSE:
             ret = not self.is_running()
             if ret:
@@ -1026,7 +1024,9 @@ class Postgresql(ClusterSite):
                 self.config.save_configuration_files(True)  # TODO: maybe remove this?
             return ret
         else:
-            if ready != PgIsReadyStatus.RUNNING:
+            # Kingbase hot_standby=off 备库永远拒绝普通连接（REJECT）。
+            # REJECT 表示 postmaster 在运行且拒绝连接 = 备库正常状态，视为运行中。
+            if ready != PgIsReadyStatus.RUNNING and self._naming.flavor != 'kingbase':
                 # Bad configuration or unexpected OS error. No idea of PostgreSQL status.
                 # Let the main loop of run cycle clean up the mess.
                 logger.warning("%s status returned from pg_isready",
