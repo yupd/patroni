@@ -32,6 +32,7 @@ from .config import ConfigHandler, mtime
 from .connection import ConnectionPool, get_connection_cursor
 from .misc import parse_history, parse_lsn, postgres_major_version_to_int, PostgresqlRole, PostgresqlState
 from .mpp import AbstractMPP
+from .naming import FlavorNaming
 from .postmaster import PostmasterProcess
 from .slots import SlotsHandler
 from .sync import SyncHandler
@@ -84,8 +85,12 @@ class Postgresql(ClusterSite):
         self.scope: str = config['scope']
         self._data_dir: str = config['data_dir']
         self._database = config.get('database', 'postgres')
-        self._version_file = os.path.join(self._data_dir, 'PG_VERSION')
-        self._pg_control = os.path.join(self._data_dir, 'global', 'pg_control')
+
+        # Database flavor naming: supports 'postgresql' (default) and 'kingbase'
+        db_flavor = config.get('database_flavor', 'postgresql')
+        self._naming = FlavorNaming(db_flavor)
+        self._version_file = os.path.join(self._data_dir, self._naming.version_file)
+        self._pg_control = os.path.join(self._data_dir, 'global', self._naming.control_file)
         self.connection_string: str
         self.proxy_url: Optional[str]
         self._major_version = self.get_major_version()
@@ -183,7 +188,7 @@ class Postgresql(ClusterSite):
 
     @property
     def wal_dir(self) -> str:
-        return os.path.join(self._data_dir, 'pg_' + self.wal_name)
+        return os.path.join(self._data_dir, self._naming.wal_dir_prefix + self.wal_name)
 
     @property
     def wal_name(self) -> str:
@@ -285,17 +290,22 @@ class Postgresql(ClusterSite):
         return 0
 
     def pgcommand(self, cmd: str) -> str:
-        """Return path to the specified PostgreSQL command.
+        """Return path to the specified command binary.
 
         .. note::
-            If ``postgresql.bin_name.*cmd*`` was configured by the user then that binary name is used, otherwise the
-            default binary name *cmd* is used.
+            If ``postgresql.bin_name.*cmd*`` was configured by the user then that binary name is used.
+            Otherwise falls back to the database flavor's default binary name.
 
-        :param cmd: the Postgres binary name to get path to.
+        :param cmd: the canonical command name to get path to.
 
-        :returns: path to Postgres binary named *cmd*.
+        :returns: path to binary named *cmd* (with flavor translation).
         """
-        return os.path.join(self._bin_dir, (self.config.get('bin_name', {}) or EMPTY_DICT).get(cmd, cmd))
+        bin_map = (self.config.get('bin_name', {}) or EMPTY_DICT)
+        # Check user-configured bin_name first, then fall back to flavor default
+        bin_name = bin_map.get(cmd)
+        if bin_name is None:
+            bin_name = self._naming.get_bin_name(cmd)
+        return os.path.join(self._bin_dir, bin_name)
 
     def pg_ctl(self, cmd: str, *args: str, **kwargs: Any) -> bool:
         """Builds and executes pg_ctl command
@@ -685,7 +695,7 @@ class Postgresql(ClusterSite):
         # we noticed that postgres was restarted, force syncing of replication slots and check of logical slots
         self.slots_handler.schedule()
 
-        self._postmaster_proc = PostmasterProcess.from_pidfile(self.pgcommand('postgres'), self._data_dir)
+        self._postmaster_proc = PostmasterProcess.from_pidfile(self.pgcommand('postgres'), self._data_dir, self._naming)
         return self._postmaster_proc
 
     @property
@@ -1324,7 +1334,8 @@ class Postgresql(ClusterSite):
     def pg_wal_realpath(self) -> Dict[str, str]:
         """Returns a dict containing the symlink (key) and target (value) for the wal directory"""
         links: Dict[str, str] = {}
-        for pg_wal_dir in ('pg_xlog', 'pg_wal'):
+        prefix = self._naming.wal_dir_prefix
+        for pg_wal_dir in (prefix + 'xlog', prefix + 'wal'):
             pg_wal_path = os.path.join(self._data_dir, pg_wal_dir)
             if os.path.exists(pg_wal_path) and os.path.islink(pg_wal_path):
                 pg_wal_realpath = os.path.realpath(pg_wal_path)
@@ -1334,7 +1345,7 @@ class Postgresql(ClusterSite):
     def pg_tblspc_realpaths(self) -> Dict[str, str]:
         """Returns a dict containing the symlink (key) and target (values) for the tablespaces"""
         links: Dict[str, str] = {}
-        pg_tblsp_dir = os.path.join(self._data_dir, 'pg_tblspc')
+        pg_tblsp_dir = os.path.join(self._data_dir, self._naming.tblspc_dir)
         if os.path.exists(pg_tblsp_dir):
             for tsdn in os.listdir(pg_tblsp_dir):
                 pg_tsp_path = os.path.join(pg_tblsp_dir, tsdn)

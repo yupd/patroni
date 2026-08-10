@@ -191,7 +191,7 @@ class SlotsHandler:
         self._advance = SlotsAdvanceThread(self)
         self._replication_slots: Dict[str, Dict[str, Any]] = {}  # already existing replication slots
         self._logical_slots_processing_queue: Dict[str, Optional[int]] = {}
-        self.pg_replslot_dir = os.path.join(self._postgresql.data_dir, 'pg_replslot')
+        self.pg_replslot_dir = os.path.join(self._postgresql.data_dir, self._postgresql._naming.replslot_dir)
         self.schedule()
 
     def _query(self, sql: str, *params: Any) -> List[Tuple[Any, ...]]:

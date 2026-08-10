@@ -1,0 +1,66 @@
+scope: dsg_kb_cluster
+#namespace: /service/
+name: kingbase0
+
+restapi:
+  listen: 127.0.0.1:8008
+  connect_address: 127.0.0.1:8008
+
+etcd:
+  host: 127.0.0.1:2379
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      parameters:
+        # Kingbase uses same parameter names as PostgreSQL
+        max_connections: 500
+        max_worker_processes: 8
+        max_wal_senders: 10
+        max_replication_slots: 10
+        max_prepared_transactions: 0
+        max_locks_per_transaction: 64
+        wal_log_hints: "on"
+        track_commit_timestamp: "off"
+        archive_mode: "on"
+        archive_timeout: 1800s
+        archive_command: /bin/true
+
+  initdb:
+  - encoding: UTF8
+
+postgresql:
+  database_flavor: kingbase                   # <-- KEY: enables Kingbase naming conventions
+  listen: 0.0.0.0:54321                       # Kingbase default port
+  connect_address: 127.0.0.1:54321
+  data_dir: /home/kingbase/userdata/data
+  bin_dir: /home/kingbase/install/kingbase/bin
+  config_dir: /home/kingbase/userdata/data
+  config_base_name: kingbase                  # generates kingbase.conf instead of postgresql.conf
+  pgpass: /tmp/pgpass0
+  authentication:
+    replication:
+      username: replicator
+      password: rep-pass
+    superuser:
+      username: system                        # Kingbase default superuser
+      password: login@135                     # Kingbase default password
+    rewind:
+      username: rewind_user
+      password: rewind_password
+  parameters:
+    unix_socket_directories: '..'
+    shared_buffers: 128MB
+    max_stack_depth: 5MB
+    dynamic_shared_memory_type: posix
+    password_encryption: scram-sha-256
+
+tags:
+    noloadbalance: false
+    clonefrom: false
+    nostream: false

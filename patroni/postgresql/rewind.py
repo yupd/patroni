@@ -585,17 +585,18 @@ class Rewind(object):
         return self._state == REWIND_STATUS.FAILED
 
     def read_postmaster_opts(self) -> Dict[str, str]:
-        """returns the list of option names/values from postgres.opts, Empty dict if read failed or no file"""
+        """returns the list of option names/values from the postmaster opts file, Empty dict if read failed or no file"""
         result: Dict[str, str] = {}
         try:
-            with open(os.path.join(self._postgresql.data_dir, 'postmaster.opts')) as f:
+            opts_filename = self._postgresql._naming.opts_file
+            with open(os.path.join(self._postgresql.data_dir, opts_filename)) as f:
                 data = f.read()
                 for opt in data.split('" "'):
                     if '=' in opt and opt.startswith('--'):
                         name, val = opt.split('=', 1)
                         result[name.strip('-')] = val.rstrip('"\n')
         except IOError:
-            logger.exception('Error when reading postmaster.opts')
+            logger.exception('Error when reading %s', opts_filename)
         return result
 
     def single_user_mode(self, communicate: Optional[Dict[str, Any]] = None,

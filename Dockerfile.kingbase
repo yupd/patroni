@@ -1,0 +1,46 @@
+## Patroni + KingbaseES V8 Docker image
+## Builds on top of the existing Kingbase Docker image and adds Patroni for HA management
+##
+## Usage:
+##   docker build -f Dockerfile.kingbase -t patroni-kingbase:latest .
+##
+## Requires kingbase:v8.0 image to be present in local Docker registry.
+
+ARG KINGBASE_IMAGE=kingbase:v8.0
+
+FROM ${KINGBASE_IMAGE} as kingbase
+
+# Install Python3 dependencies for Patroni
+# Kingbase image uses yum-based CentOS/RHEL
+RUN yum install -y python3 python3-pip python3-devel gcc curl jq && \
+    pip3 install patroni[etcd] python-dateutil psutil PyYAML && \
+    yum clean all
+
+# Create Patroni user (not using kingbase user directly to avoid permission conflicts)
+RUN useradd -r -m -d /home/patroni -s /bin/bash patroni && \
+    mkdir -p /home/patroni/.config/patroni /run/haproxy && \
+    chown -R patroni:patroni /home/patroni
+
+# Copy Patroni source
+COPY patroni /patroni/
+COPY patroni*.py /
+COPY kingbase0.yml /home/patroni/
+COPY docker/entrypoint.sh /
+
+# Setup symlinks and permissions
+RUN sed -i 's/env python/&3/' /patroni*.py && \
+    ln -s /patronictl.py /usr/local/bin/patronictl && \
+    ln -s ../../kingbase0.yml /home/patroni/.config/patroni/patronictl.yaml && \
+    # Add kingbase bin to PATH
+    echo 'export PATH=/home/kingbase/install/kingbase/bin:$PATH' >> /home/patroni/.bashrc && \
+    chown -R patroni:patroni /home/patroni /run/haproxy
+
+# etcd binary (embed for self-contained deployment)
+# ADD etcd /usr/local/bin/etcd
+# ADD etcdctl /usr/local/bin/etcdctl
+
+USER patroni
+ENV PATH=/home/kingbase/install/kingbase/bin:/usr/local/bin:/usr/bin:/bin
+ENV ETCDCTL_API=3
+
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]

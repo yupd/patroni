@@ -14,6 +14,7 @@ import psutil
 
 from patroni import KUBERNETES_ENV_PREFIX, PATRONI_ENV_PREFIX
 from patroni.daemon import SOCKET_ENV_VARIABLE
+from .naming import FlavorNaming
 
 # avoid spawning the resource tracker process
 if sys.version_info >= (3, 8):  # pragma: no cover
@@ -55,19 +56,20 @@ class PostmasterProcess(psutil.Process):
         super(PostmasterProcess, self).__init__(pid)
 
     @staticmethod
-    def _read_postmaster_pidfile(data_dir: str) -> Dict[str, str]:
-        """Reads and parses postmaster.pid from the data directory
+    def _read_postmaster_pidfile(data_dir: str, naming: Optional[FlavorNaming] = None) -> Dict[str, str]:
+        """Reads and parses the postmaster pid file from the data directory
 
         :returns dictionary of values if successful, empty dictionary otherwise
         """
         pid_line_names = ['pid', 'data_dir', 'start_time', 'port', 'socket_dir', 'listen_addr', 'shmem_key']
+        pid_filename = naming.pid_file if naming else 'postmaster.pid'
         try:
-            with open(os.path.join(data_dir, 'postmaster.pid')) as f:
+            with open(os.path.join(data_dir, pid_filename)) as f:
                 return {name: line.rstrip('\n') for name, line in zip(pid_line_names, f)}
         except IOError:
             return {}
 
-    def _is_postmaster_process(self, pgcommand: str, data_dir: str) -> bool:
+    def _is_postmaster_process(self, pgcommand: str, data_dir: str, naming: Optional[FlavorNaming] = None) -> bool:
         """Determine whether this process is the postmaster.
 
         This method applies several heuristics to decide if the PID read from ``postmaster.pid``
@@ -117,7 +119,8 @@ class PostmasterProcess(psutil.Process):
                         value = base
                 return os.path.basename(value)
 
-            valid_exes = frozenset([normalize_exe(os.path.basename(pgcommand)), 'postmaster'])
+            valid_exes = naming.postmaster_exe if naming else frozenset(
+                [normalize_exe(os.path.basename(pgcommand)), 'postmaster'])
             if normalize_exe(exe) not in valid_exes:
                 logger.info('Process %d from postmaster.pid with executable file "%s" does not look like postgres',
                             self.pid, exe)
@@ -152,22 +155,24 @@ class PostmasterProcess(psutil.Process):
         return False
 
     @classmethod
-    def _from_pidfile(cls, data_dir: str) -> Optional['PostmasterProcess']:
-        postmaster_pid = PostmasterProcess._read_postmaster_pidfile(data_dir)
+    def _from_pidfile(cls, data_dir: str, naming: Optional[FlavorNaming] = None) -> Optional['PostmasterProcess']:
+        postmaster_pid = PostmasterProcess._read_postmaster_pidfile(data_dir, naming)
         try:
             pid = int(postmaster_pid.get('pid', 0))
             if pid:
                 proc = cls(pid)
                 proc._postmaster_pid = postmaster_pid
+                if naming:
+                    proc._naming = naming
                 return proc
         except ValueError:
             return None
 
     @staticmethod
-    def from_pidfile(pgcommand: str, data_dir: str) -> Optional['PostmasterProcess']:
+    def from_pidfile(pgcommand: str, data_dir: str, naming: Optional[FlavorNaming] = None) -> Optional['PostmasterProcess']:
         try:
-            proc = PostmasterProcess._from_pidfile(data_dir)
-            return proc if proc and proc._is_postmaster_process(pgcommand, data_dir) else None
+            proc = PostmasterProcess._from_pidfile(data_dir, naming)
+            return proc if proc and proc._is_postmaster_process(pgcommand, data_dir, naming) else None
         except psutil.NoSuchProcess:
             return None
 
@@ -259,7 +264,8 @@ class PostmasterProcess(psutil.Process):
             *stop_timeout*.
         """
         # These regexps are cross checked against versions PostgreSQL 9.1 .. 19
-        aux_proc_re = re.compile("(?:postgres:)( .*:)? (?:(?:archiver|startup|autovacuum launcher|autovacuum worker|"
+        proc_prefix = self._naming.proc_prefix if hasattr(self, '_naming') else 'postgres:'
+        aux_proc_re = re.compile("(?:" + re.escape(proc_prefix) + ")( .*:)? (?:(?:archiver|startup|autovacuum launcher|autovacuum worker|"
                                  "checkpointer|logger|stats collector|wal receiver|wal writer|writer)(?: process  )?|"
                                  "syslogger|walreceiver|wal sender process|walsender|walwriter|background writer|"
                                  "logical replication launcher|logical replication worker for subscription|"

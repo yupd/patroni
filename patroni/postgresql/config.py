@@ -21,6 +21,7 @@ from ..utils import compare_values, get_postgres_version, is_subpath, \
     maybe_convert_from_base_unit, parse_bool, parse_int, split_host_port, uri, validate_directory
 from ..validator import EnumValidator, IntValidator
 from .misc import get_major_from_minor_version, postgres_version_to_int, PostgresqlRole, PostgresqlState
+from .naming import FlavorNaming
 from .sync import SYNC_STRICT_PLACEHOLDER
 from .validator import recovery_parameters, transform_postgresql_parameter_value, transform_recovery_parameter_value
 
@@ -384,18 +385,20 @@ class ConfigHandler(object):
     def __init__(self, postgresql: 'Postgresql', config: Dict[str, Any]) -> None:
         self._postgresql = postgresql
         self._config_dir = os.path.abspath(config.get('config_dir', '') or postgresql.data_dir)
-        config_base_name = config.get('config_base_name', 'postgresql')
+        # Use database flavor naming for file names
+        self._naming = postgresql._naming
+        config_base_name = config.get('config_base_name', self._naming.config_base_name)
         self._postgresql_conf = os.path.join(self._config_dir, config_base_name + '.conf')
         self._postgresql_conf_mtime = None
         self._postgresql_base_conf_name = config_base_name + '.base.conf'
         self._postgresql_base_conf = os.path.join(self._config_dir, self._postgresql_base_conf_name)
-        self._pg_hba_conf = os.path.join(self._config_dir, 'pg_hba.conf')
-        self._pg_ident_conf = os.path.join(self._config_dir, 'pg_ident.conf')
+        self._pg_hba_conf = os.path.join(self._config_dir, self._naming.hba_file)
+        self._pg_ident_conf = os.path.join(self._config_dir, self._naming.ident_file)
         self._recovery_conf = os.path.join(postgresql.data_dir, 'recovery.conf')
         self._recovery_conf_mtime = None
         self._recovery_signal = os.path.join(postgresql.data_dir, 'recovery.signal')
         self._standby_signal = os.path.join(postgresql.data_dir, 'standby.signal')
-        self._auto_conf = os.path.join(postgresql.data_dir, 'postgresql.auto.conf')
+        self._auto_conf = os.path.join(postgresql.data_dir, self._naming.auto_conf_file)
         self._auto_conf_mtime = None
         self._pgpass = os.path.abspath(config.get('pgpass') or os.path.join(os.path.expanduser('~'), 'pgpass'))
         if os.path.exists(self._pgpass) and not os.path.isfile(self._pgpass):
