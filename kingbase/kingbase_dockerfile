@@ -1,0 +1,39 @@
+FROM  tp-harbor.intra.nsfocus.com/cneosv2/eos_base:66866
+# MAINTAINER  KDBDEV support@kingbase.com.cn
+USER root
+EXPOSE 54321
+ENV PATH /usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/kingbase/install/kingbase/bin:
+RUN source /etc/profile ;\
+     mkdir -p /tmp ;\
+     mkdir -p /tmp ;\
+     chmod 777 /tmp ;\
+     useradd -m kingbase ;\
+     echo "root:login@135" | chpasswd; \
+     echo "kingbase:login@135" | chpasswd
+
+RUN mkdir -p /home/kingbase/userdata/ ;\
+    mkdir -p /home/kingbase/install/  ;\
+    chown -R kingbase:kingbase  /home/kingbase/userdata/ ;\
+    chown -R kingbase:kingbase  /home/kingbase/install;\
+    chown -R kingbase:kingbase  /home/kingbase
+
+# COPY .ssh/* /root/.ssh/
+COPY --chown=kingbase:kingbase scripts/docker-entrypoint.sh /home/kingbase/docker-entrypoint.sh
+COPY --chown=kingbase:kingbase kingbase     /home/kingbase/install/kingbase
+# COPY --chown=kingbase:kingbase license.dat /home/kingbase/install/kingbase/bin/license.dat
+# COPY limits.conf /etc/security/limits.conf
+# COPY sysctl.conf /etc/sysctl.conf
+
+WORKDIR /home/kingbase/
+
+ENV USER=kingbase
+USER root
+RUN chmod  755  /home/kingbase/docker-entrypoint.sh
+RUN mkdir /etc/cron.d ;\
+    echo "kingbase ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kingbase ; \
+    echo "LANG=en_US.UTF-8" > /etc/locale.conf ;\
+    chmod  644 /etc/locale.conf
+
+
+USER kingbase
+ENTRYPOINT ["/bin/bash","/home/kingbase/docker-entrypoint.sh"]

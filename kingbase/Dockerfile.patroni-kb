@@ -1,0 +1,84 @@
+# Patroni + KingbaseES V8 on CentOS 7
+# 多阶段构建：从旧 kingbase:v8.0 镜像拷贝 Kingbase 安装文件，在 CentOS 7 上组装
+#
+# 构建:
+#   cd /root/kingbase && docker build -f Dockerfile.patroni-kb -t patroni-kingbase:latest .
+
+# ====== Stage 1: 从旧镜像提取 Kingbase 文件 ======
+FROM kingbase:v8.0 AS kingbase
+
+# ====== Stage 2: CentOS 7 + Patroni + Kingbase ======
+FROM centos:7
+
+LABEL maintainer="dsg-team"
+LABEL description="Patroni HA manager for KingbaseES V8 on CentOS 7"
+
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+# ---------- 修复 CentOS 7 EOL 镜像源 ----------
+RUN sed -i "s/mirrorlist/#mirrorlist/g" /etc/yum.repos.d/CentOS-*.repo && \
+    sed -i "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*.repo
+
+# ---------- 系统基础依赖 ----------
+RUN set -ex && \
+    yum install -y epel-release && \
+    sed -i "s/mirrorlist/#mirrorlist/g" /etc/yum.repos.d/epel*.repo 2>/dev/null; \
+    sed -i "s|#baseurl=http://download.fedoraproject.org|baseurl=https://archives.fedoraproject.org/pub/archive|g" /etc/yum.repos.d/epel*.repo 2>/dev/null; \
+    yum install -y \
+        curl wget jq tar gzip \
+        python3 python3-pip python3-devel \
+        gcc make openssl openssl-devel \
+        sudo passwd which hostname \
+        net-tools haproxy \
+    && yum clean all && \
+    pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
+# ---------- Patroni + 依赖 ----------
+RUN pip3 install --no-cache-dir \
+    "psycopg2-binary" \
+    "patroni[etcd]" \
+    python-dateutil \
+    psutil \
+    PyYAML
+
+# ---------- 从旧镜像拷贝 Kingbase ----------
+COPY --from=kingbase /home/kingbase/install/kingbase /home/kingbase/install/kingbase
+COPY --from=kingbase /home/kingbase/docker-entrypoint.sh /home/kingbase/docker-entrypoint.sh
+
+# ---------- 设置 Kingbase 用户与权限 ----------
+RUN mkdir -p /home/kingbase/userdata /etc/cron.d && \
+    (useradd -u 27 -m -d /home/kingbase -s /sbin/nologin kingbase 2>/dev/null || \
+     useradd -u 27 -m -d /home/kingbase -s /sbin/nologin kingbase 2>/dev/null || \
+     (usermod -u 27 kingbase 2>/dev/null; groupmod -g 27 kingbase 2>/dev/null; true)) && \
+    chown -R kingbase:kingbase /home/kingbase && \
+    chmod 755 /home/kingbase/docker-entrypoint.sh && \
+    chmod -R 700 /home/kingbase/userdata && \
+    echo "kingbase ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kingbase && \
+    chmod 440 /etc/sudoers.d/kingbase && \
+    localedef -i en_US -f UTF-8 en_US.UTF-8 2>/dev/null || true
+
+# ---------- Patroni 源码 ----------
+COPY patroni /patroni/
+COPY patroni.py /patroni.py
+COPY patronictl.py /patronictl.py
+COPY kingbase0.yml /kingbase0.yml
+COPY entrypoint_kb.sh /entrypoint.sh
+
+# ---------- Patroni 用户 ----------
+RUN useradd -r -m -d /home/patroni -s /bin/bash patroni 2>/dev/null && \
+    chown -R patroni:patroni /home/patroni && \
+    echo "export PATH=/home/kingbase/install/kingbase/bin:\$PATH" >> /home/patroni/.bashrc && \
+    sed -i "s|^#!/usr/bin/env python\b|#!/usr/bin/env python3|" /patroni.py 2>/dev/null; \
+    sed -i "s|^#!/usr/bin/env python\b|#!/usr/bin/env python3|" /patronictl.py 2>/dev/null; \
+    true
+
+ENV PATH=/home/kingbase/install/kingbase/bin:/usr/local/bin:/usr/bin:/bin
+ENV USER=kingbase
+
+RUN mkdir -p /run/haproxy && chmod 777 /run/haproxy && \
+    chmod +x /entrypoint.sh
+
+EXPOSE 54321 8008
+
+USER patroni
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
