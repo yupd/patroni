@@ -1,19 +1,29 @@
 # Patroni + KingbaseES V8 on CentOS 7
 # 多阶段构建：从旧 kingbase:v8.0 镜像拷贝 Kingbase 安装文件，在 CentOS 7 上组装
 #
+# 对齐原版 patroni Dockerfile，包含：
+#   - etcd 3.3.13  (DCS 集群协调)
+#   - confd 0.16.0 (HAProxy 动态配置)
+#   - haproxy       (读写分离代理)
+#   - Patroni + KingbaseES V8
+#
 # 构建:
 #   cd /root/kingbase && docker build -f Dockerfile.patroni-kb -t patroni-kingbase:latest .
+
+ARG ETCDVERSION=3.3.13
+ARG CONFDVERSION=0.16.0
 
 # ====== Stage 1: 从旧镜像提取 Kingbase 文件 ======
 FROM kingbase:v8.0 AS kingbase
 
-# ====== Stage 2: CentOS 7 + Patroni + Kingbase ======
+# ====== Stage 2: CentOS 7 + etcd/confd + Patroni + Kingbase ======
 FROM centos:7
 
 LABEL maintainer="dsg-team"
 LABEL description="Patroni HA manager for KingbaseES V8 on CentOS 7"
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+ARG ETCDVERSION CONFDVERSION
 
 # ---------- 修复 CentOS 7 EOL 镜像源 ----------
 RUN sed -i "s/mirrorlist/#mirrorlist/g" /etc/yum.repos.d/CentOS-*.repo && \
@@ -33,6 +43,31 @@ RUN set -ex && \
     && yum clean all && \
     pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
+# ---------- etcd 3.3.13 ----------
+RUN set -ex && \
+    ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64)  ETCD_ARCH="amd64" ;; \
+        aarch64) ETCD_ARCH="arm64" ;; \
+        *)       ETCD_ARCH="amd64" ;; \
+    esac && \
+    curl -sL "https://github.com/etcd-io/etcd/releases/download/v${ETCDVERSION}/etcd-v${ETCDVERSION}-linux-${ETCD_ARCH}.tar.gz" \
+        | tar xz -C /usr/local/bin --strip=1 --wildcards --no-anchored etcd etcdctl && \
+    etcd --version
+
+# ---------- confd 0.16.0 ----------
+RUN set -ex && \
+    ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64)  CONFD_ARCH="amd64" ;; \
+        aarch64) CONFD_ARCH="arm64" ;; \
+        *)       CONFD_ARCH="amd64" ;; \
+    esac && \
+    curl -sL "https://github.com/kelseyhightower/confd/releases/download/v${CONFDVERSION}/confd-${CONFDVERSION}-linux-${CONFD_ARCH}" \
+        -o /usr/local/bin/confd && \
+    chmod +x /usr/local/bin/confd && \
+    mkdir -p /etc/confd/conf.d /etc/confd/templates
+
 # ---------- Patroni + 依赖 ----------
 RUN pip3 install --no-cache-dir \
     "psycopg2-binary" \
@@ -44,6 +79,12 @@ RUN pip3 install --no-cache-dir \
 # ---------- 从旧镜像拷贝 Kingbase ----------
 COPY --from=kingbase /home/kingbase/install/kingbase /home/kingbase/install/kingbase
 COPY --from=kingbase /home/kingbase/docker-entrypoint.sh /home/kingbase/docker-entrypoint.sh
+
+# ---------- HAProxy + confd 模板 ----------
+RUN mkdir -p /etc/haproxy
+COPY haproxy_kb.cfg /etc/haproxy/haproxy.cfg
+COPY extras/confd/conf.d/haproxy.toml /etc/confd/conf.d/
+COPY extras/confd/templates/haproxy.tmpl /etc/confd/templates/
 
 # ---------- 设置 Kingbase 用户与权限 ----------
 RUN mkdir -p /home/kingbase/userdata /etc/cron.d && \
@@ -72,13 +113,14 @@ RUN useradd -r -m -d /home/patroni -s /bin/bash patroni 2>/dev/null && \
     sed -i "s|^#!/usr/bin/env python\b|#!/usr/bin/env python3|" /patronictl.py 2>/dev/null; \
     true
 
-ENV PATH=/home/kingbase/install/kingbase/bin:/usr/local/bin:/usr/bin:/bin
+ENV PATH=/home/kingbase/install/kingbase/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
+ENV ETCDCTL_API=3
 ENV USER=kingbase
 
 RUN mkdir -p /run/haproxy && chmod 777 /run/haproxy && \
     chmod +x /entrypoint.sh
 
-EXPOSE 54321 8008
+EXPOSE 54321 8008 5000 5001 7000
 
 USER patroni
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
