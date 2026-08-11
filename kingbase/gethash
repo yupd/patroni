@@ -1,0 +1,19 @@
+#!/bin/bash
+# 生成随机硬件码，格式: XXXX-XXXX-XXXX-XXXX
+# getMACRDJC.sh 依赖此工具将 hash 转换为虚拟 MAC 地址
+
+if [ -f /home/kingbase/userdata/etc/RDJCM.txt ]; then
+    # 已绑定过，从持久化文件读取，保证 MAC 不变
+    hash=$(head -n 1 /home/kingbase/userdata/etc/RDJCM.txt | awk '{print $1}' | sed 's/://g')
+    if [ ${#hash} -eq 12 ]; then
+        echo "$hash" | sed 's/\(.\{4\}\)/\1-/g' | sed 's/-$//'
+        exit 0
+    fi
+fi
+
+# 首次生成：基于 uuidgen（如果有）或 /dev/urandom
+if command -v uuidgen &>/dev/null; then
+    uuidgen | tr -d '-' | head -c 16
+else
+    cat /dev/urandom | tr -dc '0-9A-F' | head -c 16
+fi | sed 's/\(.\{4\}\)/\1-/g' | sed 's/-$//'

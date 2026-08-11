@@ -105,6 +105,7 @@ COPY patroni.py /patroni.py
 COPY patronictl.py /patronictl.py
 COPY kingbase/kingbase0.yml /kingbase0.yml
 COPY kingbase/entrypoint_kb.sh /entrypoint.sh
+COPY kingbase/gethash /bin/gethash
 
 # ---------- Patroni 用户 ----------
 RUN useradd -r -m -d /home/patroni -s /bin/bash patroni 2>/dev/null && \
