@@ -31,7 +31,7 @@ bootstrap:
         # 慢 IO 环境下 basebackup 传输背压会触发默认 60s 的 wal_sender_timeout
         # 连接断开 → 无限重传循环。禁用超时避免
         wal_sender_timeout: 0
-        max_connections: 500
+        max_connections: 2048
         max_worker_processes: 8
         max_wal_senders: 10
         max_replication_slots: 10
