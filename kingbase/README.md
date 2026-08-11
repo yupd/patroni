@@ -88,6 +88,16 @@ the program to close and exit when the corresponding function is turned on.
 If you are unsure of the impact, please contact the license provider.
 ```
 
+### max_connections 受 license 限制
+
+**当前 license 的 `max_connections` 上限为 1000**。配置超过 1000 会被 Kingbase 自动钳制并打 WARNING：
+
+```
+WARNING: max_connections should be less than or equal than 1000 (restricted by license)
+```
+
+模板默认 `max_connections: 1000`（达到 license 上限）。如需更大连接数，需申请更高授权的 license。
+
 ### 其他限制
 
 - 备库拒绝 replication 连接（已用 sys_controldata fallback 显示 LSN）
