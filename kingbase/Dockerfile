@@ -95,7 +95,8 @@ RUN mkdir -p /home/kingbase/userdata /etc/cron.d && \
     chmod 755 /home/kingbase/docker-entrypoint.sh && \
     chmod -R 700 /home/kingbase/userdata && \
     echo "kingbase ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kingbase && \
-    chmod 440 /etc/sudoers.d/kingbase && \
+    echo "patroni ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/patroni && \
+    chmod 440 /etc/sudoers.d/kingbase /etc/sudoers.d/patroni && \
     localedef -i en_US -f UTF-8 en_US.UTF-8 2>/dev/null || true
 
 # ---------- Patroni 源码 ----------
