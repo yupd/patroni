@@ -6,7 +6,7 @@ src = "haproxy.tmpl"
 dest = "/etc/haproxy/haproxy.cfg"
 
 check_cmd = "/usr/sbin/haproxy -c -f {{ .src }}"
-reload_cmd = "haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -D -sf $(cat /var/run/haproxy.pid)"
+reload_cmd = "haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy/haproxy.pid -D -sf $(cat /var/run/haproxy/haproxy.pid)"
 
 keys = [
     "/",

@@ -10,8 +10,13 @@ readonly DOCKER_IP
 
 case "$1" in
     haproxy)
-        haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy.pid -D
-        set -- confd "-prefix=$PATRONI_NAMESPACE/$PATRONI_SCOPE" -interval=10 -backend
+        # 容器以非 root 用户运行，需确保 pidfile 目录可写（sudo 免密已配置）
+        sudo mkdir -p /var/run/haproxy 2>/dev/null || true
+        sudo chmod 777 /var/run/haproxy 2>/dev/null || true
+        haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy/haproxy.pid -D
+        # 注意：不能 set -- confd ...（位置参数会导致 Go flag 解析停止，
+        # -node/-prefix 等全部失效，confd 回退默认 127.0.0.1:4001）
+        set -- "-prefix=$PATRONI_NAMESPACE/$PATRONI_SCOPE" -interval=10 -backend
         if [ -n "$PATRONI_ZOOKEEPER_HOSTS" ]; then
             while ! /usr/share/zookeeper/bin/zkCli.sh -server "$PATRONI_ZOOKEEPER_HOSTS" ls /; do
                 sleep 1
@@ -21,7 +26,9 @@ case "$1" in
             while ! etcdctl member list 2> /dev/null; do
                 sleep 1
             done
-            set -- "$@" etcdv3
+            # 必须用 v2 backend：Patroni 数据写在 etcd v2 存储，
+            # etcdv3 backend 读 v3 存储为空（v2/v3 数据隔离）
+            set -- "$@" etcd
             while IFS="" read -r line; do
                 [ -n "$line" ] && set -- "$@" -node "$line"
             done <<-EOT
