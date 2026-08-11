@@ -68,7 +68,7 @@ docker build -f kingbase/Dockerfile -t patroni:kb-v8 .
 
 当前备库能力：WAL 流复制 ✅（Lag=0）、故障切换 ✅、只读查询 ❌、读写分离 ❌。
 
-**启用读操作**：申请金仓集群版 license → 替换 license.dat → `hot_standby: on` → 重启集群 → 启用 HAProxy 读写分离（`haproxy_kb.cfg` 已备好）。详细步骤见 `docs/patroni-kingbase-adaptation-guide.md` 第 7.1 节。
+**启用读操作**：申请金仓集群版 license → 替换 license.dat → `hot_standby: on` → 重启集群 → 启用 HAProxy 读写分离（`haproxy_kb.cfg` 已备好）。
 
 ### 其他限制
 
