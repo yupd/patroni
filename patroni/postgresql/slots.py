@@ -607,6 +607,11 @@ class SlotsHandler:
         """
         ret = []
         if self._postgresql.major_version >= 90400 and cluster.config:
+            # Kingbase hot_standby=off 备库拒绝普通连接，无法查询 pg_replication_slots，
+            # 跳过 slot 同步（避免每次 HA loop 报错）
+            if self._postgresql._naming.flavor == 'kingbase' \
+                    and self._postgresql.role != PostgresqlRole.PRIMARY:
+                return ret
             try:
                 self.load_replication_slots()
 
