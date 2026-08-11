@@ -1465,9 +1465,23 @@ class RestApiHandler(BaseHTTPRequestHandler):
         except (psycopg.Error, RetryFailedError, PostgresConnectionException):
             state = postgresql.state
             if state == PostgresqlState.RUNNING:
-                logger.exception('get_postgresql_status')
-                state = 'unknown'
+                # Kingbase hot_standby=off 备库查询失败是常态（license 限制），
+                # 保留 RUNNING 状态供 haproxy /replica 健康检查使用
+                if not (postgresql._naming.flavor == 'kingbase'
+                        and postgresql.role != PostgresqlRole.PRIMARY):
+                    logger.exception('get_postgresql_status')
+                    state = 'unknown'
             result: Dict[str, Any] = {'state': state, 'role': postgresql.role}
+            # Kingbase hot_standby=off 备库拒绝连接，查询必然失败。
+            # 用 sys_controldata fallback 的 replay LSN 填充 xlog，
+            # 避免 haproxy /replica 健康检查因 is_lagging=True 返回 503
+            if postgresql._naming.flavor == 'kingbase' and result['role'] != PostgresqlRole.PRIMARY:
+                try:
+                    replay = postgresql.replay_lsn()
+                except Exception:
+                    replay = None
+                if replay:
+                    result['xlog'] = {'replayed_location': replay, 'received_location': replay}
 
         if config.is_paused:
             result['pause'] = True
