@@ -23,7 +23,8 @@ bootstrap:
       - host all all 0.0.0.0/0 md5
       parameters:
         # Kingbase uses same parameter names as PostgreSQL
-        listen_addresses: '*'
+        # 注意：listen_addresses 不能写在这里（Patroni 禁止动态设置该参数，校验失败），
+        # 由 Patroni 从 postgresql.listen 自动推断
         # DSG 自带 license 不支持 hot_standby，必须 off（流复制本身不依赖它）
         hot_standby: "off"
         # 慢 IO 环境下 basebackup 传输背压会触发默认 60s 的 wal_sender_timeout
