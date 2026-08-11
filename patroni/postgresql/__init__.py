@@ -510,70 +510,74 @@ class Postgresql(ClusterSite):
 
     def _cluster_info_state_get(self, name: str) -> Optional[Any]:
         if not self._cluster_info_state:
-            try:
-                result = self._is_leader_retry(self._query, self.cluster_info_query)[0]
-                cluster_info_state = dict(zip(['timeline', 'wal_position', 'replay_lsn',
-                                               'receive_lsn', 'replay_paused', 'pg_control_timeline',
-                                               'received_tli', 'write_location', 'slot_name', 'conninfo',
-                                               'receiver_state', 'restore_command', 'slots', 'synchronous_commit',
-                                               'synchronous_standby_names', 'pg_stat_replication'], result))
-                if self._should_query_slots and self.can_advance_slots:
-                    cluster_info_state['slots'] =\
-                        self.slots_handler.process_permanent_slots(cluster_info_state['slots'])
-                self._cluster_info_state = cluster_info_state
-            except psycopg.OperationalError as e:
-                if e.diag.sqlstate == '57014':  # QueryCanceled
-                    self._cluster_info_state = {'error': str(e)}
-                else:
-                    raise
-            except RetryFailedError as e:  # SELECT failed two times
-                self._cluster_info_state = {'error': str(e)}
-                # Kingbase hot_standby=off 备库永远 REJECT（license 限制），
-                # 监控查询失败是常态，不能据此把 state 降回 STARTING
-                if not self.is_starting() and self.pg_isready() == PgIsReadyStatus.REJECT \
-                        and self._naming.flavor != 'kingbase':
-                    self.set_state(PostgresqlState.STARTING)
-
-        if 'error' in self._cluster_info_state:
-            # Kingbase hot_standby=off 备库拒绝普通连接，cluster_info_query 必然失败。
-            # 用 sys_controldata 的恢复位置填充 LSN/timeline 信息，
-            # 让 patronictl list 显示 Receive/Replay LSN 而非 unknown。
-            # 注意：用 role 判断而非 is_primary()（避免递归触发 _cluster_info_state_get）
+            # Kingbase hot_standby=off 备库拒绝所有连接，预设 error 跳过 query+retry
             if self._naming.flavor == 'kingbase' and self.role != PostgresqlRole.PRIMARY:
-                data = self.controldata()
-                replay = data.get('Minimum recovery ending location')
-                if replay:
-                    try:
-                        replay_int = parse_lsn(replay)
-                    except (IndexError, ValueError):
-                        replay_int = None
-                    if replay_int is not None:
-                        timeline = 0  # 备库 timeline=0（非 primary）
+                self._cluster_info_state = {'error': 'kingbase replica (hot_standby=off)'}
+            else:
+                try:
+                    result = self._is_leader_retry(self._query, self.cluster_info_query)[0]
+                    cluster_info_state = dict(zip(['timeline', 'wal_position', 'replay_lsn',
+                                                   'receive_lsn', 'replay_paused', 'pg_control_timeline',
+                                                   'received_tli', 'write_location', 'slot_name', 'conninfo',
+                                                   'receiver_state', 'restore_command', 'slots', 'synchronous_commit',
+                                                   'synchronous_standby_names', 'pg_stat_replication'], result))
+                    if self._should_query_slots and self.can_advance_slots:
+                        cluster_info_state['slots'] =\
+                            self.slots_handler.process_permanent_slots(cluster_info_state['slots'])
+                    self._cluster_info_state = cluster_info_state
+                except psycopg.OperationalError as e:
+                    if e.diag.sqlstate == '57014':  # QueryCanceled
+                        self._cluster_info_state = {'error': str(e)}
+                    else:
+                        raise
+                except RetryFailedError as e:  # SELECT failed two times
+                    self._cluster_info_state = {'error': str(e)}
+                    # Kingbase hot_standby=off 备库永远 REJECT（license 限制），
+                    # 监控查询失败是常态，不能据此把 state 降回 STARTING
+                    if not self.is_starting() and self.pg_isready() == PgIsReadyStatus.REJECT \
+                            and self._naming.flavor != 'kingbase':
+                        self.set_state(PostgresqlState.STARTING)
+    
+            if 'error' in self._cluster_info_state:
+                # Kingbase hot_standby=off 备库拒绝普通连接，cluster_info_query 必然失败。
+                # 用 sys_controldata 的恢复位置填充 LSN/timeline 信息，
+                # 让 patronictl list 显示 Receive/Replay LSN 而非 unknown。
+                # 注意：用 role 判断而非 is_primary()（避免递归触发 _cluster_info_state_get）
+                if self._naming.flavor == 'kingbase' and self.role != PostgresqlRole.PRIMARY:
+                    data = self.controldata()
+                    replay = data.get('Minimum recovery ending location')
+                    if replay:
                         try:
-                            pg_ctl_timeline = int(data.get("Latest checkpoint's TimeLineID", 0) or 0)
-                        except (TypeError, ValueError):
-                            pg_ctl_timeline = 0
-                        self._cluster_info_state = {
-                            'timeline': timeline,
-                            'wal_position': replay_int,
-                            'replay_lsn': replay_int,
-                            'receive_lsn': replay_int,
-                            'replay_paused': False,
-                            'pg_control_timeline': pg_ctl_timeline,
-                            'received_tli': pg_ctl_timeline,
-                            'write_location': replay_int,
-                            'slot_name': None,
-                            'conninfo': None,
-                            'receiver_state': None,
-                            'restore_command': None,
-                            'slots': None,
-                            'synchronous_commit': 'on',
-                            'synchronous_standby_names': '',
-                            'pg_stat_replication': [],
-                        }
-                        return self._cluster_info_state.get(name)
-            raise PostgresConnectionException(self._cluster_info_state['error'])
-
+                            replay_int = parse_lsn(replay)
+                        except (IndexError, ValueError):
+                            replay_int = None
+                        if replay_int is not None:
+                            timeline = 0  # 备库 timeline=0（非 primary）
+                            try:
+                                pg_ctl_timeline = int(data.get("Latest checkpoint's TimeLineID", 0) or 0)
+                            except (TypeError, ValueError):
+                                pg_ctl_timeline = 0
+                            self._cluster_info_state = {
+                                'timeline': timeline,
+                                'wal_position': replay_int,
+                                'replay_lsn': replay_int,
+                                'receive_lsn': replay_int,
+                                'replay_paused': False,
+                                'pg_control_timeline': pg_ctl_timeline,
+                                'received_tli': pg_ctl_timeline,
+                                'write_location': replay_int,
+                                'slot_name': None,
+                                'conninfo': None,
+                                'receiver_state': None,
+                                'restore_command': None,
+                                'slots': None,
+                                'synchronous_commit': 'on',
+                                'synchronous_standby_names': '',
+                                'pg_stat_replication': [],
+                            }
+                            return self._cluster_info_state.get(name)
+                raise PostgresConnectionException(self._cluster_info_state['error'])
+    
         return self._cluster_info_state.get(name)
 
     def replay_lsn(self) -> Optional[int]:
