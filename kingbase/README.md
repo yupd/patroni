@@ -77,6 +77,5 @@ docker build -f kingbase/Dockerfile -t patroni:kb-v8 .
 
 ## 参考
 
-- 完整适配文档：`docs/patroni-kingbase-adaptation-guide.md`
 - Kingbase 官方高可用文档：https://help.kingbase.com.cn/v8/highly/availability/index.html
 - 官方集群工具参考：`kingbase/ref/`
