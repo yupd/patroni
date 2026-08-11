@@ -49,8 +49,8 @@ bootstrap:
 postgresql:
   database_flavor: kingbase                   # <-- KEY: enables Kingbase naming conventions
   database: kingbase                           # Kingbase default DB (not 'postgres'/'dsg')
-  listen: 0.0.0.0:54321                       # Kingbase default port
-  connect_address: 127.0.0.1:54321
+  listen: 0.0.0.0:5432                        # 与 PostgreSQL 默认端口一致
+  connect_address: 127.0.0.1:5432
   data_dir: /home/kingbase/userdata/data
   bin_dir: /home/kingbase/install/kingbase/bin
   config_dir: /home/kingbase/userdata/data

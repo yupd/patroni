@@ -122,7 +122,7 @@ ENV USER=kingbase
 RUN mkdir -p /run/haproxy && chmod 777 /run/haproxy && \
     chmod +x /entrypoint.sh
 
-EXPOSE 54321 8008 5000 5001 7000
+EXPOSE 5432 8008 5000 5001 7000
 
 USER patroni
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
