@@ -3,16 +3,16 @@
 #
 # 用法（在仓库根目录执行）:
 #   bash kingbase/build.sh
-#   bash kingbase/build.sh -t my-registry/patroni-kingbase:v1
+#   bash kingbase/build.sh -t my-registry/patroni-kb-v8:v1
 #
 # 说明：
 #   - 构建上下文为仓库根目录（包含 patroni/ 源码）
-#   - 默认镜像名: patroni-kingbase:latest
+#   - 默认镜像名: patroni:kb-v8
 #   - 前置条件: 本机已有 kingbase:v8.0 镜像（多阶段构建的源）
 
 set -e
 
-IMAGE="patroni-kingbase:latest"
+IMAGE="patroni:kb-v8"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -22,7 +22,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             echo "用法: bash kingbase/build.sh [-t 镜像名]"
-            echo "  -t, --tag   指定镜像标签（默认 patroni-kingbase:latest）"
+            echo "  -t, --tag   指定镜像标签（默认 patroni:kb-v8）"
             exit 0
             ;;
         *)
@@ -54,5 +54,5 @@ echo "=== 构建完成 ==="
 echo "镜像: $IMAGE"
 echo
 echo "导出镜像:"
-echo "  docker save $IMAGE -o patroni-kingbase.tar"
-echo "  md5sum patroni-kingbase.tar"
+echo "  docker save $IMAGE -o patroni-kb-v8.tar"
+echo "  md5sum patroni-kb-v8.tar"

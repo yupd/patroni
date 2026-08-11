@@ -14,7 +14,7 @@ cd patroni
 bash kingbase/build.sh
 
 # 3. 导出镜像（可选）
-docker save patroni-kingbase:latest -o patroni-kingbase.tar
+docker save patroni:kb-v8 -o patroni-kb-v8.tar
 ```
 
 ## 目录结构
@@ -38,7 +38,7 @@ patroni/                          ← Patroni 源码（含 Kingbase 适配修复
 bash kingbase/build.sh
 
 # 方式二：手动构建（上下文必须是仓库根）
-docker build -f kingbase/Dockerfile -t patroni-kingbase:latest .
+docker build -f kingbase/Dockerfile -t patroni:kb-v8 .
 ```
 
 **Dockerfile 要点**（多阶段构建）：
@@ -79,7 +79,7 @@ docker run -d --name kb-etcd --network host --restart always --cpus=2 \
   -e ETCD_ADVERTISE_CLIENT_URLS=http://<节点IP>:22379 \
   -e ETCD_INITIAL_ADVERTISE_PEER_URLS=http://<节点IP>:22380 \
   -v /opt/nsfocus/data/kb-etcd:/var/lib/etcd \
-  patroni-kingbase:latest --auto-compaction-retention=1 --data-dir=/var/lib/etcd \
+  patroni:kb-v8 --auto-compaction-retention=1 --data-dir=/var/lib/etcd \
   --heartbeat-interval=500 --election-timeout=3000
 
 # 3. 部署 Patroni（每节点，先 Leader 后 Replica）
