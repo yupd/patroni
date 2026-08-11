@@ -88,8 +88,18 @@ docker run -d --name kb-etcd --network host --restart always --cpus=2 \
 
 ## 已知限制
 
-- 备库只读查询不可用（DSG 自带 license 不支持 hot_standby，需申请集群版 license）
+### 备库读操作：当前不支持
+
+备库**不支持只读查询**（无法读写分离）。原因：DSG 自带 license 不含 hot_standby 授权，`hot_standby: off` 下 Kingbase 拒绝所有连接（与 PG 不同）。
+
+当前备库能力：WAL 流复制 ✅（Lag=0）、故障切换 ✅、只读查询 ❌、读写分离 ❌。
+
+**启用读操作**：申请金仓集群版 license → 替换 license.dat → `hot_standby: on` → 重启集群 → 启用 HAProxy 读写分离（`haproxy_kb.cfg` 已备好）。详细步骤见 `docs/patroni-kingbase-adaptation-guide.md` 第 7.1 节。
+
+### 其他限制
+
 - 备库拒绝 replication 连接（已用 sys_controldata fallback 显示 LSN）
+- 备库 slots 管理禁用（复制槽由主库管理）
 
 ## 参考
 
