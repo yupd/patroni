@@ -68,14 +68,16 @@ if [ -f "${PERSIST_ETC_PATH}/getMACRDJC.sh" ]; then
 fi
 
 # 2. license.dat 证书 symlink（原始脚本 db_init / main 中的逻辑）
-# 注意：DB_PATH/bin/ 属 root，需 sudo 删除旧文件再创建 symlink
+# 注意：Kingbase 要求 license.dat 可写（否则 FATAL: License file should have write access）
 LICENSE_BIN="${DB_PATH}/bin/license.dat"
 if [ -f "${PERSIST_ETC_PATH}/license.dat" ]; then
+    sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
     sudo rm -f "$LICENSE_BIN"
     sudo ln -sf "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
 elif [ -f "$LICENSE_BIN" ] && [ ! -L "$LICENSE_BIN" ]; then
     # license 在 bin 下（旧挂载），移至 etc 持久化
     sudo mv "$LICENSE_BIN" "${PERSIST_ETC_PATH}/license.dat"
+    sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
     sudo ln -sf "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
 fi
 
