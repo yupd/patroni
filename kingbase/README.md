@@ -60,32 +60,6 @@ docker build -f kingbase/Dockerfile -t patroni:kb-v8 .
 | WAL 目录 | `pg_wal` | `sys_wal` |
 | 二进制 | `pg_ctl` ... | `sys_ctl` ... |
 
-## 三节点集群部署
-
-详见完整指南：[docs/patroni-kingbase-adaptation-guide.md](../../docs/patroni-kingbase-adaptation-guide.md)
-
-### 快速部署命令
-
-```bash
-# 1. 分发镜像并 docker load（3 台机器）
-# 2. 部署 etcd（每节点）
-docker run -d --name kb-etcd --network host --restart always --cpus=2 \
-  --entrypoint etcd \
-  -e ETCD_NAME=etcd-XX \
-  -e ETCD_INITIAL_CLUSTER='etcd-67=http://192.168.11.67:22380,etcd-68=http://192.168.11.68:22380,etcd-69=http://192.168.11.69:22380' \
-  -e ETCD_INITIAL_CLUSTER_STATE=new \
-  -e ETCD_LISTEN_PEER_URLS=http://0.0.0.0:22380 \
-  -e ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:22379 \
-  -e ETCD_ADVERTISE_CLIENT_URLS=http://<节点IP>:22379 \
-  -e ETCD_INITIAL_ADVERTISE_PEER_URLS=http://<节点IP>:22380 \
-  -v /opt/nsfocus/data/kb-etcd:/var/lib/etcd \
-  patroni:kb-v8 --auto-compaction-retention=1 --data-dir=/var/lib/etcd \
-  --heartbeat-interval=500 --election-timeout=3000
-
-# 3. 部署 Patroni（每节点，先 Leader 后 Replica）
-#    参考 docs/patroni-kingbase-adaptation-guide.md 第 5 章
-```
-
 ## 已知限制
 
 ### 备库读操作：当前不支持
