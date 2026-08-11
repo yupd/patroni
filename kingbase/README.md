@@ -70,6 +70,24 @@ docker build -f kingbase/Dockerfile -t patroni:kb-v8 .
 
 **启用读操作**：申请金仓集群版 license → 替换 license.dat → `hot_standby: on` → 重启集群 → 启用 HAProxy 读写分离（`haproxy_kb.cfg` 已备好）。
 
+### License 检查
+
+```bash
+# 容器内检查 license 状态（到期时间、禁用功能）
+/home/kingbase/install/kingbase/bin/kingbase --check-license /home/kingbase/userdata/etc/license.dat
+```
+
+示例输出（DSG 当前 license）：
+
+```
+Check successfully. remaining 90 day, license file will expire in 2026-11-09.
+Warning:
+    hot standby
+These controls are disabled in the current license file. If you do not enable these controls,
+the program to close and exit when the corresponding function is turned on.
+If you are unsure of the impact, please contact the license provider.
+```
+
 ### 其他限制
 
 - 备库拒绝 replication 连接（已用 sys_controldata fallback 显示 LSN）
