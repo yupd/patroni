@@ -407,6 +407,11 @@ class Postgresql(ClusterSite):
             :exc:`~patroni.utils.RetryFailedError`: if it was detected that connection/query failed due to PostgreSQL
             restart.
         """
+        # Kingbase hot_standby=off 备库拒绝所有连接，任何数据库查询都必然失败。
+        # 直接抛 PostgresConnectionException 跳过 TCP 连接尝试，由 _cluster_info_state_get
+        # 的 controldata fallback 提供监控数据（LSN/timeline 等）。
+        if self._naming.flavor == 'kingbase' and self.role != PostgresqlRole.PRIMARY:
+            raise PostgresConnectionException('kingbase replica (hot_standby=off)')
         try:
             return self._connection.query(sql, *params)
         except PostgresConnectionException as exc:
