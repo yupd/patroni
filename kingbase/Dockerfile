@@ -82,7 +82,7 @@ COPY --from=kingbase /home/kingbase/docker-entrypoint.sh /home/kingbase/docker-e
 
 # ---------- HAProxy + confd 模板 ----------
 RUN mkdir -p /etc/haproxy
-COPY haproxy_kb.cfg /etc/haproxy/haproxy.cfg
+COPY kingbase/haproxy_kb.cfg /etc/haproxy/haproxy.cfg
 COPY extras/confd/conf.d/haproxy.toml /etc/confd/conf.d/
 COPY extras/confd/templates/haproxy.tmpl /etc/confd/templates/
 
@@ -102,8 +102,8 @@ RUN mkdir -p /home/kingbase/userdata /etc/cron.d && \
 COPY patroni /patroni/
 COPY patroni.py /patroni.py
 COPY patronictl.py /patronictl.py
-COPY kingbase0.yml /kingbase0.yml
-COPY entrypoint_kb.sh /entrypoint.sh
+COPY kingbase/kingbase0.yml /kingbase0.yml
+COPY kingbase/entrypoint_kb.sh /entrypoint.sh
 
 # ---------- Patroni 用户 ----------
 RUN useradd -r -m -d /home/patroni -s /bin/bash patroni 2>/dev/null && \
