@@ -1384,8 +1384,13 @@ class Ha(object):
             self._last_timeline = my_timeline
         my_wal_position = self.state_handler.last_operation()
         if check_replication_lag and self.is_lagging(my_wal_position):
-            logger.info('My wal position exceeds maximum replication lag')
-            return False  # Too far behind last reported wal position on primary
+            # Kingbase hot_standby=off 备库的 LSN 来自 sys_controldata 快照，
+            # 不是实时查询结果，与 etcd 中 leader 最终 LSN 之间存在固有偏差，
+            # 跳过 replication lag 检查（否则备库永远无法通过健康评估，自动故障切换完全失效）
+            if not (self.state_handler._naming.flavor == 'kingbase'
+                    and self.state_handler.role == 'replica'):
+                logger.info('My wal position exceeds maximum replication lag')
+                return False  # Too far behind last reported wal position on primary
 
         if not self.is_standby_cluster() and self.check_timeline():
             if my_timeline is None:
