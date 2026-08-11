@@ -2,18 +2,17 @@
 # 生成随机硬件码，格式: XXXX-XXXX-XXXX-XXXX
 # getMACRDJC.sh 依赖此工具将 hash 转换为虚拟 MAC 地址
 
-HW_CODE_FILE=/home/kingbase/userdata/etc/.hardware_code
+MACHINE_ID_FILE=/home/kingbase/userdata/etc/.machine-id
 
-if [ -f "$HW_CODE_FILE" ]; then
-    # 已绑定过，直接读取持久化的硬件码
-    cat "$HW_CODE_FILE"
+if [ -f "$MACHINE_ID_FILE" ]; then
+    cat "$MACHINE_ID_FILE"
     exit 0
 fi
 
 # 首次生成
-mkdir -p "$(dirname "$HW_CODE_FILE")"
+mkdir -p "$(dirname "$MACHINE_ID_FILE")"
 if command -v uuidgen &>/dev/null; then
     uuidgen | tr -d '-' | head -c 16
 else
     cat /dev/urandom | tr -dc '0-9A-F' | head -c 16
-fi | sed 's/\(.\{4\}\)/\1-/g' | sed 's/-$//' | tee "$HW_CODE_FILE"
+fi | sed 's/\(.\{4\}\)/\1-/g' | sed 's/-$//' | tr 'a-z' 'A-Z' | tee "$MACHINE_ID_FILE"
