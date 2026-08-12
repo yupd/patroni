@@ -76,9 +76,6 @@ if [ -f "${PERSIST_ETC_PATH}/license.dat" ]; then
     sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
     sudo cp -f "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
     sudo chmod 666 "$LICENSE_BIN"
-elif [ -f "$LICENSE_BIN" ] && [ ! -L "$LICENSE_BIN" ]; then
-    # license 只在 bin 下（无挂载场景），保留不动
-    :
 fi
 
 # 启动 Patroni
