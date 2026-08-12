@@ -58,8 +58,8 @@ export PATRONI_SUPERUSER_PASSWORD="${PATRONI_SUPERUSER_PASSWORD:-login@135}"
 
 # ====== Kingbase 运行时初始化（保留原始 docker-entrypoint.sh 关键逻辑） ======
 DB_PATH=/home/kingbase/install/kingbase
-DATA_DIR="${PATRONI_POSTGRESQL_DATA_DIR}"
-PERSIST_ETC_PATH=${DATA_DIR}/../etc
+# 挂载路径固定写死（部署脚本约定挂载 /opt/nsfocus/data/common_data/kingbase → 此目录）
+PERSIST_ETC_PATH=/home/kingbase/userdata/etc
 
 # 1. 绑定虚拟化 MAC 地址（license 验证依赖，原始脚本 pre_exe 中的逻辑）
 # getMACRDJC.sh 缺失时命令静默失败（2>/dev/null），脚本继续；
