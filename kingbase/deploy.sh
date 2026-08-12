@@ -30,6 +30,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # ============================ 默认配置 ============================
 PATRONI_SCOPE="dsg_kb_cluster"
 PGPORT=5432
+# 注意：镜像内 kingbase0.yml 的 authentication 段已被 Dockerfile 注释（方案 B），
+# 用户名/密码必须全部由环境变量提供（缺 username 会导致 bootstrap 不创建对应角色，
+# 备库克隆报 password authentication failed for user "replicator"）
+PATRONI_SUPERUSER_USERNAME="system"
+PATRONI_REPLICATION_USERNAME="replicator"
 PATRONI_SUPERUSER_PASSWORD="login@135"
 PATRONI_REPLICATION_PASSWORD="rep-pass"
 
@@ -275,6 +280,8 @@ deploy_patroni() {
             -e PATRONI_NAME=kb-${leader_octet} \
             -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
             -e PATRONI_ETCD_HOST=127.0.0.1:22379 \
+            -e PATRONI_SUPERUSER_USERNAME=${PATRONI_SUPERUSER_USERNAME} \
+            -e PATRONI_REPLICATION_USERNAME=${PATRONI_REPLICATION_USERNAME} \
             -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
             -e PATRONI_REPLICATION_PASSWORD=${PATRONI_REPLICATION_PASSWORD} \
             -e PATRONI_POSTGRESQL_CONNECT_ADDRESS=${leader_ip}:${PGPORT} \
@@ -316,7 +323,9 @@ deploy_patroni() {
                 -e PATRONI_NAME=kb-${octet} \
                 -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
                 -e PATRONI_ETCD_HOST=127.0.0.1:22379 \
-                -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
+                -e PATRONI_SUPERUSER_USERNAME=${PATRONI_SUPERUSER_USERNAME} \
+                -e PATRONI_REPLICATION_USERNAME=${PATRONI_REPLICATION_USERNAME} \
+            -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
                 -e PATRONI_REPLICATION_PASSWORD=${PATRONI_REPLICATION_PASSWORD} \
                 -e PATRONI_POSTGRESQL_CONNECT_ADDRESS=${ip}:${PGPORT} \
                 -e PATRONI_POSTGRESQL_LISTEN=0.0.0.0:${PGPORT} \
