@@ -70,15 +70,14 @@ fi
 # 2. license.dat 证书（原始脚本 db_init / main 中的逻辑）
 # 直接复制（cp）而非软连接：不依赖挂载点持续存在（避免 symlink 悬挂），
 # 且每次容器启动重新 cp 自动同步最新 license（替换 license 后重启容器即生效）。
+# license.dat 缺失时相关命令报错，用 2>/dev/null 忽略（Kingbase 启动时自会报 license 错误）。
 # 注意：Kingbase 要求 license.dat 可写（否则 FATAL: License file should have write access）
 LICENSE_BIN="${DB_PATH}/bin/license.dat"
-if [ -f "${PERSIST_ETC_PATH}/license.dat" ]; then
-    sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
-    # 先删除旧文件/悬挂 symlink：cp -f 拒绝写入悬挂 symlink（not writing through dangling symlink）
-    sudo rm -f "$LICENSE_BIN"
-    sudo cp -f "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
-    sudo chmod 666 "$LICENSE_BIN"
-fi
+sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat" 2>/dev/null
+# 先删除旧文件/悬挂 symlink：cp -f 拒绝写入悬挂 symlink（not writing through dangling symlink）
+sudo rm -f "$LICENSE_BIN"
+sudo cp -f "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN" 2>/dev/null
+sudo chmod 666 "$LICENSE_BIN" 2>/dev/null
 
 # 启动 Patroni
 exec python3 /patroni.py /kingbase0.yml
