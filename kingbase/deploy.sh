@@ -273,7 +273,7 @@ deploy_patroni() {
             --network host --hostname kb-${leader_octet} --restart always --privileged \
             -e PATRONI_SCOPE=${PATRONI_SCOPE} \
             -e PATRONI_NAME=kb-${leader_octet} \
-            -e PATRONI_ETCD_HOSTS=${ETCD_HOSTS_CSV} \
+            -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
             -e PATRONI_ETCD_HOST=127.0.0.1:22379 \
             -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
             -e PATRONI_REPLICATION_PASSWORD=${PATRONI_REPLICATION_PASSWORD} \
@@ -314,7 +314,7 @@ deploy_patroni() {
                 --network host --hostname kb-${octet} --restart always --privileged \
                 -e PATRONI_SCOPE=${PATRONI_SCOPE} \
                 -e PATRONI_NAME=kb-${octet} \
-                -e PATRONI_ETCD_HOSTS=${ETCD_HOSTS_CSV} \
+                -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
                 -e PATRONI_ETCD_HOST=127.0.0.1:22379 \
                 -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
                 -e PATRONI_REPLICATION_PASSWORD=${PATRONI_REPLICATION_PASSWORD} \
@@ -372,7 +372,7 @@ deploy_haproxy() {
                 --network host --restart always --privileged \
                 -e PATRONI_SCOPE=${PATRONI_SCOPE} \
                 -e PATRONI_NAMESPACE=/service \
-                -e PATRONI_ETCD_HOSTS=${ETCD_HOSTS_CSV} \
+                -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
                 -e ETCDCTL_ENDPOINTS=${ETCD_HTTP_ENDPOINTS} \
                 ${IMAGE} haproxy
             sleep 2

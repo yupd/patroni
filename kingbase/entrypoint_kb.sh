@@ -26,9 +26,9 @@ case "$1" in
             while ! etcdctl member list 2> /dev/null; do
                 sleep 1
             done
-            # 必须用 v2 backend：Patroni 数据写在 etcd v2 存储，
-            # etcdv3 backend 读 v3 存储为空（v2/v3 数据隔离）
-            set -- "$@" etcd
+            # 用 etcdv3 backend：镜像内 kingbase0.yml 的 etcd 段已被注释（对齐 PG 镜像），
+            # Patroni 走 etcd3（v3 API）写入 v3 存储，confd 必须用 etcdv3 才能读到
+            set -- "$@" etcdv3
             while IFS="" read -r line; do
                 [ -n "$line" ] && set -- "$@" -node "$line"
             done <<-EOT

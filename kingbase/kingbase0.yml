@@ -7,11 +7,10 @@ restapi:
   connect_address: 127.0.0.1:8008
 
 etcd:
-  # 注意：本段为 etcd v2 客户端（confd 依赖 v2 读取成员，不能换 etcd3）。
-  # host 仅作单点 fallback；部署时必须通过环境变量 PATRONI_ETCD_HOSTS
-  # 注入 hosts 列表（hosts 优先于 host），例如:
-  #   -e PATRONI_ETCD_HOSTS=192.168.11.67:22379,192.168.11.68:22379,192.168.11.69:22379
-  # 这样无论 etcd 监听 0.0.0.0 还是仅节点 IP 均可连接（无需写死 IP 在本文件）。
+  # 本段在镜像构建时被 Dockerfile 注释（对齐 PG 镜像做法）：
+  #   sed -i 's/^\(scope\|name\|etcd\|  host\|  authentication\|  connect_address\|  parameters\):/#&/' /kingbase0.yml
+  # 运行时 DCS 配置完全由环境变量 PATRONI_ETCD3_HOSTS 注入（etcd3 v3 API），
+  # confd 同步使用 etcdv3 backend 读取（v2/v3 数据隔离）。
   host: 127.0.0.1:22379
 
 bootstrap:

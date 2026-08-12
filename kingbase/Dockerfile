@@ -105,6 +105,13 @@ COPY patroni.py /patroni.py
 COPY patronictl.py /patronictl.py
 COPY kingbase/kingbase0.yml /kingbase0.yml
 COPY kingbase/entrypoint_kb.sh /entrypoint.sh
+
+# ---------- "fix" patroni config（对齐 PG 镜像 Dockerfile） ----------
+# 注释静态 DCS/身份段（scope/name/etcd/host/authentication/connect_address/parameters），
+# 运行时完全由 PATRONI_* 环境变量注入，避免配置文件段抢占环境变量
+# （Patroni 按字母序选 DCS：etcd 段存在会优先于 PATRONI_ETCD3_HOSTS 的 etcd3 段）。
+# bootstrap.dcs.postgresql.parameters（6 空格缩进）不在匹配范围，hot_standby 等关键参数保留。
+RUN sed -i 's/^\(scope\|name\|etcd\|  host\|  authentication\|  connect_address\|  parameters\):/#&/' /kingbase0.yml
 COPY kingbase/gethash /bin/gethash
 
 # ---------- Patroni 用户 ----------
