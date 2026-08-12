@@ -52,6 +52,10 @@ bootstrap:
 
   initdb:
   - encoding: UTF8
+  # 必须 dbmode: pg（Kingbase initdb 默认 oracle 模式）：
+  # oracle 模式下 level 是保留字，而旧库（单机 initdb -m pg）导出的 dump 未转义裸 level，
+  # 导入会报 syntax error at or near "level"。pg 模式与旧库一致，dump 可直接导入
+  - dbmode: pg
 
 postgresql:
   database_flavor: kingbase                   # <-- KEY: enables Kingbase naming conventions
