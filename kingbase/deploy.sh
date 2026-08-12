@@ -235,7 +235,7 @@ deploy_etcd() {
 
 # ============================ 构建 etcd hosts 环境变量 ============================
 build_etcd_vars() {
-    local hosts_py="" hosts_http="" first=true
+    local hosts_py="" hosts_http="" hosts_csv="" first=true
     for ip in "${NODES[@]}"; do
         if [ "$first" = true ]; then
             hosts_py="['${ip}:22379'"
@@ -245,10 +245,13 @@ build_etcd_vars() {
         fi
         [ -n "$hosts_http" ] && hosts_http="${hosts_http},"
         hosts_http="${hosts_http}http://${ip}:22379"
+        [ -n "$hosts_csv" ] && hosts_csv="${hosts_csv},"
+        hosts_csv="${hosts_csv}${ip}:22379"
     done
     hosts_py="${hosts_py}]"
     ETCD_HOSTS_PY="$hosts_py"
     ETCD_HTTP_ENDPOINTS="$hosts_http"
+    ETCD_HOSTS_CSV="$hosts_csv"
 }
 
 # ============================ 部署 Patroni ============================
@@ -270,7 +273,7 @@ deploy_patroni() {
             --network host --hostname kb-${leader_octet} --restart always --privileged \
             -e PATRONI_SCOPE=${PATRONI_SCOPE} \
             -e PATRONI_NAME=kb-${leader_octet} \
-            -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
+            -e PATRONI_ETCD_HOSTS=${ETCD_HOSTS_CSV} \
             -e PATRONI_ETCD_HOST=127.0.0.1:22379 \
             -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
             -e PATRONI_REPLICATION_PASSWORD=${PATRONI_REPLICATION_PASSWORD} \
@@ -311,7 +314,7 @@ deploy_patroni() {
                 --network host --hostname kb-${octet} --restart always --privileged \
                 -e PATRONI_SCOPE=${PATRONI_SCOPE} \
                 -e PATRONI_NAME=kb-${octet} \
-                -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
+                -e PATRONI_ETCD_HOSTS=${ETCD_HOSTS_CSV} \
                 -e PATRONI_ETCD_HOST=127.0.0.1:22379 \
                 -e PATRONI_SUPERUSER_PASSWORD=${PATRONI_SUPERUSER_PASSWORD} \
                 -e PATRONI_REPLICATION_PASSWORD=${PATRONI_REPLICATION_PASSWORD} \
@@ -369,7 +372,7 @@ deploy_haproxy() {
                 --network host --restart always --privileged \
                 -e PATRONI_SCOPE=${PATRONI_SCOPE} \
                 -e PATRONI_NAMESPACE=/service \
-                -e PATRONI_ETCD3_HOSTS=\"${ETCD_HOSTS_PY}\" \
+                -e PATRONI_ETCD_HOSTS=${ETCD_HOSTS_CSV} \
                 -e ETCDCTL_ENDPOINTS=${ETCD_HTTP_ENDPOINTS} \
                 ${IMAGE} haproxy
             sleep 2
