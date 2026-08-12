@@ -62,10 +62,10 @@ DATA_DIR="${PATRONI_POSTGRESQL_DATA_DIR}"
 PERSIST_ETC_PATH=${DATA_DIR}/../etc
 
 # 1. 绑定虚拟化 MAC 地址（license 验证依赖，原始脚本 pre_exe 中的逻辑）
-if [ -f "${PERSIST_ETC_PATH}/getMACRDJC.sh" ]; then
-    sudo chmod 777 "${PERSIST_ETC_PATH}/getMACRDJC.sh"
-    sudo "${PERSIST_ETC_PATH}/getMACRDJC.sh" || true
-fi
+# getMACRDJC.sh 缺失时命令静默失败（2>/dev/null），脚本继续；
+# 脚本自身可能因容器缺 ip 命令失败（|| true 兜底，不影响启动）
+sudo chmod 777 "${PERSIST_ETC_PATH}/getMACRDJC.sh" 2>/dev/null
+sudo "${PERSIST_ETC_PATH}/getMACRDJC.sh" 2>/dev/null || true
 
 # 2. license.dat 证书（原始脚本 db_init / main 中的逻辑）
 # 直接复制（cp）而非软连接：不依赖挂载点持续存在（避免 symlink 悬挂），
