@@ -107,11 +107,34 @@ COPY kingbase/kingbase0.yml /kingbase0.yml
 COPY kingbase/entrypoint_kb.sh /entrypoint.sh
 
 # ---------- "fix" patroni config（对齐 PG 镜像 Dockerfile） ----------
-# 注释静态 DCS/身份段（scope/name/etcd/host/authentication/connect_address/parameters），
+# 注释静态 DCS/身份段（scope/name/etcd/host/authentication/connect_address/parameters 及其子键），
 # 运行时完全由 PATRONI_* 环境变量注入，避免配置文件段抢占环境变量
 # （Patroni 按字母序选 DCS：etcd 段存在会优先于 PATRONI_ETCD3_HOSTS 的 etcd3 段）。
 # bootstrap.dcs.postgresql.parameters（6 空格缩进）不在匹配范围，hot_standby 等关键参数保留。
-RUN sed -i 's/^\(scope\|name\|etcd\|  host\|  authentication\|  connect_address\|  parameters\):/#&/' /kingbase0.yml
+RUN python3 - <<'EOF'
+import re
+lines = open('/kingbase0.yml').readlines()
+out = []
+in_block = False
+for line in lines:
+    # authentication / parameters 块整体注释（子键不能悬空）
+    if re.match(r'^  (authentication|parameters):', line):
+        in_block = True
+        out.append('#' + line)
+        continue
+    if in_block:
+        if re.match(r'^  [a-z]|^[a-z]', line):  # 新键（2 空格或 0 空格）→ 块结束
+            in_block = False
+        else:
+            out.append('#' + line)
+            continue
+    # 顶层 DCS/身份段
+    if re.match(r'^(scope|name|etcd|  host|  connect_address):', line):
+        out.append('#' + line)
+        continue
+    out.append(line)
+open('/kingbase0.yml', 'w').writelines(out)
+EOF
 COPY kingbase/gethash /bin/gethash
 
 # ---------- Patroni 用户 ----------
