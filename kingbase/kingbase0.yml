@@ -24,7 +24,10 @@ bootstrap:
       remove_data_directory_on_diverged_timelines: true  # Kingbase 无 sys_rewind，rewind 失败后自动删数据+重克隆
       pg_hba:
       - host replication replicator 127.0.0.1/32 md5
+      - host replication replicator ::1/128 md5    # Patroni 本地连接 localhost 走 IPv6 ::1
       - host replication replicator 0.0.0.0/0 md5
+      - host all all 127.0.0.1/32 md5
+      - host all all ::1/128 md5
       - host all all 0.0.0.0/0 md5
       parameters:
         # Kingbase uses same parameter names as PostgreSQL
