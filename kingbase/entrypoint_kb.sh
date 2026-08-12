@@ -67,18 +67,18 @@ if [ -f "${PERSIST_ETC_PATH}/getMACRDJC.sh" ]; then
     sudo "${PERSIST_ETC_PATH}/getMACRDJC.sh" || true
 fi
 
-# 2. license.dat 证书 symlink（原始脚本 db_init / main 中的逻辑）
+# 2. license.dat 证书（原始脚本 db_init / main 中的逻辑）
+# 直接复制（cp）而非软连接：不依赖挂载点持续存在（避免 symlink 悬挂），
+# 且每次容器启动重新 cp 自动同步最新 license（替换 license 后重启容器即生效）。
 # 注意：Kingbase 要求 license.dat 可写（否则 FATAL: License file should have write access）
 LICENSE_BIN="${DB_PATH}/bin/license.dat"
 if [ -f "${PERSIST_ETC_PATH}/license.dat" ]; then
     sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
-    sudo rm -f "$LICENSE_BIN"
-    sudo ln -sf "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
+    sudo cp -f "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
+    sudo chmod 666 "$LICENSE_BIN"
 elif [ -f "$LICENSE_BIN" ] && [ ! -L "$LICENSE_BIN" ]; then
-    # license 在 bin 下（旧挂载），移至 etc 持久化
-    sudo mv "$LICENSE_BIN" "${PERSIST_ETC_PATH}/license.dat"
-    sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
-    sudo ln -sf "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
+    # license 只在 bin 下（无挂载场景），保留不动
+    :
 fi
 
 # 启动 Patroni
