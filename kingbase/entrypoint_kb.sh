@@ -74,6 +74,8 @@ fi
 LICENSE_BIN="${DB_PATH}/bin/license.dat"
 if [ -f "${PERSIST_ETC_PATH}/license.dat" ]; then
     sudo chmod 666 "${PERSIST_ETC_PATH}/license.dat"
+    # 先删除旧文件/悬挂 symlink：cp -f 拒绝写入悬挂 symlink（not writing through dangling symlink）
+    sudo rm -f "$LICENSE_BIN"
     sudo cp -f "${PERSIST_ETC_PATH}/license.dat" "$LICENSE_BIN"
     sudo chmod 666 "$LICENSE_BIN"
 fi
