@@ -46,6 +46,10 @@ RUN set -ex && \
     pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
 # ---------- etcd 3.3.13 ----------
+# 注意：etcd 3.3.x 的 arm64 构建是实验性的，运行需 ETCD_UNSUPPORTED_ARCH=arm64
+# （TARGETARCH 由 buildx --platform 自动注入；普通 docker build 无此变量 → 空值 → x86 不受影响）
+ARG TARGETARCH
+ENV ETCD_UNSUPPORTED_ARCH=${TARGETARCH}
 RUN set -ex && \
     ARCH=$(uname -m) && \
     case "$ARCH" in \
