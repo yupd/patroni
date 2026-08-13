@@ -62,12 +62,14 @@ fi
 cd "$REPO_ROOT"
 if [ "$ARCH" = "arm64" ]; then
     # arm64 交叉构建：buildx + QEMU 模拟
+    # 注意：必须用 default builder（docker driver）——docker-container driver 有独立
+    # 镜像存储，看不到本地导入的 kingbase:v8.0.arm64（会尝试从 registry 拉取失败）
     if ! docker buildx ls 2>/dev/null | grep -q 'linux/arm64'; then
         echo "错误: docker buildx 不支持 linux/arm64，请先配置 binfmt:"
         echo "  docker run --privileged --rm tonistiigi/binfmt --install arm64"
         exit 1
     fi
-    docker buildx build --platform linux/arm64 \
+    docker buildx build --builder default --platform linux/arm64 \
         --build-arg KINGBASE_IMAGE=${KINGBASE_IMAGE} \
         -t "$IMAGE" \
         -o type=docker,dest=/tmp/patroni-kb-v8.arm.tar \
