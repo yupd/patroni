@@ -12,9 +12,11 @@
 
 ARG ETCDVERSION=3.3.13
 ARG CONFDVERSION=0.16.0
+# 基础镜像按架构覆盖：x86_64 用 kingbase:v8.0，aarch64 用 kingbase:v8.0.arm64
+ARG KINGBASE_IMAGE=kingbase:v8.0
 
 # ====== Stage 1: 从旧镜像提取 Kingbase 文件 ======
-FROM kingbase:v8.0 AS kingbase
+FROM ${KINGBASE_IMAGE} AS kingbase
 
 # ====== Stage 2: CentOS 7 + etcd/confd + Patroni + Kingbase ======
 FROM centos:7
