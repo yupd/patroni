@@ -39,12 +39,71 @@ bash kingbase/build.sh
 
 # 方式二：手动构建（上下文必须是仓库根）
 docker build -f kingbase/Dockerfile -t patroni:kb-v8 .
+
+# 方式三：arm64 交叉构建（在 x86 设备上构建 arm 镜像）
+bash kingbase/build.sh --arm
 ```
 
 **Dockerfile 要点**（多阶段构建）：
 - Stage 1: 从 `kingbase:v8.0` 提取 Kingbase 安装文件
 - Stage 2: `centos:7` 基础 + Python3 + Patroni 4.1.4 + etcd 3.3.13 + confd 0.16.0 + haproxy
 - 内置全部 14 处 Kingbase 适配修复（`database_flavor: kingbase` 驱动）
+
+## arm64 镜像构建（x86 交叉编译）
+
+在 x86 设备上用 `docker buildx` + QEMU 模拟交叉构建 arm64 镜像。
+
+### 前置条件
+
+```bash
+# 1. buildx 已启用（Docker 19.03+ 自带）
+docker buildx version
+
+# 2. QEMU 模拟（binfmt），使 buildx 支持 linux/arm64
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+# 3. arm64 版 Kingbase 基础镜像（从 arm64 真机导出）
+#    在 arm64 机器上: docker save kingbase:v8.0.arm64 -o kb-arm64.tar
+#    传到构建机:      docker load -i kb-arm64.tar
+docker images | grep kingbase:v8.0.arm64
+```
+
+### 构建
+
+```bash
+bash kingbase/build.sh --arm
+```
+
+输出：`patroni:kb-v8.arm`（导出到 `/tmp/patroni-kb-v8.arm.tar`）。
+
+### 验证（建议在 arm64 真机执行）
+
+```bash
+# 1. 镜像 platform
+docker inspect patroni:kb-v8.arm --format '{{.Os}}/{{.Architecture}}'   # → linux/arm64
+
+# 2. Kingbase 二进制架构（0xb7 = AArch64，0x3e = x86-64）
+docker run --rm --entrypoint sh patroni:kb-v8.arm -c \
+  'od -An -tx1 -j18 -N2 /home/kingbase/install/kingbase/bin/kingbase'
+
+# 3. 文件完整性（bin 94 + lib 257 个文件）
+docker run --rm --entrypoint sh patroni:kb-v8.arm -c \
+  'ls /home/kingbase/install/kingbase/bin/ | wc -l; ls /home/kingbase/install/kingbase/lib/ | wc -l'
+```
+
+### 架构差异说明（Dockerfile 自动处理）
+
+| 项 | x86_64 | aarch64 |
+|----|--------|---------|
+| 基础镜像 | `kingbase:v8.0` | `kingbase:v8.0.arm64`（`KINGBASE_IMAGE` build-arg 覆盖） |
+| etcd 3.3.13 | amd64 二进制 | arm64 二进制 + `ETCD_UNSUPPORTED_ARCH=arm64`（3.3.x arm64 实验性） |
+| psycopg2 | `psycopg2-binary`（有 wheel） | 源码编译（无 cp36+aarch64 wheel）：`postgresql-devel` + `psycopg2==2.9.8` |
+| confd / haproxy | 架构自动 | 架构自动 |
+
+### 已知坑
+
+- **buildx 必须用 default builder**（docker driver）：`docker-container` driver 有独立镜像存储，看不到本地导入的 `kingbase:v8.0.arm64`（会尝试从 docker.io 拉取失败）
+- **基础镜像 platform 元数据可能错**（显示 amd64 但内容是 arm64）：从 arm64 真机 `docker save` 的镜像 tar 可能丢 platform 元数据。只要二进制是 AArch64（上述验证第 2 步），COPY 提取内容正确，构建时的 `InvalidBaseImagePlatform` 警告可忽略
 
 ## 核心适配：database_flavor
 
