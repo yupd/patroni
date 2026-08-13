@@ -97,7 +97,7 @@ docker run --rm --entrypoint sh patroni:kb-v8.arm -c \
 |----|--------|---------|
 | 基础镜像 | `kingbase:v8.0` | `kingbase:v8.0.arm64`（`KINGBASE_IMAGE` build-arg 覆盖） |
 | etcd 3.3.13 | amd64 二进制 | arm64 二进制 + `ETCD_UNSUPPORTED_ARCH=arm64`（3.3.x arm64 实验性） |
-| psycopg2 | `psycopg2-binary`（有 wheel） | 源码编译（无 cp36+aarch64 wheel）：`postgresql-devel` + `psycopg2==2.9.8` |
+| psycopg2 | `psycopg2-binary`（有 wheel，自带新 libpq） | 源码编译（无 cp36+aarch64 wheel）：`postgresql-devel` + `psycopg2==2.9.8`；**关键：编译前把系统 libpq.so.5（9.2）替换为 Kingbase 自带版（5.12）**——系统 libpq 9.2 不支持 SCRAM，Kingbase V8 服务端强制 SCRAM-SHA-256，否则报 `SCRAM authentication requires libpq version 10 or above`；编译后 `patchelf --set-rpath /home/kingbase/install/kingbase/lib` 指向 libpq 原始位置（其 RUNPATH `$ORIGIN/../lib` 依赖相对位置，副本在 /usr/lib64 会解析失败） |
 | confd / haproxy | 架构自动 | 架构自动 |
 
 ### 已知坑

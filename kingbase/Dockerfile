@@ -74,17 +74,34 @@ RUN set -ex && \
     chmod +x /usr/local/bin/confd && \
     mkdir -p /etc/confd/conf.d /etc/confd/templates
 
+# ---------- 从旧镜像拷贝 Kingbase ----------
+# 注意：必须先于 Patroni 依赖安装——arm64 源码编译 psycopg2 需要 Kingbase 的 libpq
+COPY --from=kingbase /home/kingbase/install/kingbase /home/kingbase/install/kingbase
+COPY --from=kingbase /home/kingbase/docker-entrypoint.sh /home/kingbase/docker-entrypoint.sh
+
 # ---------- Patroni + 依赖 ----------
 # psycopg2 安装策略按架构：
-#   amd64: psycopg2-binary 有 wheel ✅
-#   arm64: psycopg2-binary 无 cp36+aarch64 wheel（实测 pip 21.3.1 仅 sdist），
-#          源码编译（需要 pg_config，由 postgresql-devel 提供）
+#   amd64: psycopg2-binary 有 wheel（自带新版 libpq，支持 SCRAM）✅
+#   arm64: psycopg2-binary 无 cp36+aarch64 wheel（实测 pip 21.3.1 仅 sdist）→ 源码编译。
+#          但系统 postgresql-devel 的 libpq 是 9.2——Kingbase V8 服务端用 SCRAM-SHA-256
+#          认证，libpq<10 会报 "SCRAM authentication requires libpq version 10 or above"
+#          （x86 没踩坑正是因为 binary wheel 自带新 libpq）。
+#          → 编译前把系统 libpq.so.5 替换为 Kingbase 自带的（5.12，PG12 内核，支持 SCRAM）。
+#          两者 soname 相同（libpq.so.5），ABI 兼容；容器内 libpq.so.5 无其他消费者
+#          （psql 等未安装），替换安全。
+#          运行时：Kingbase libpq 带 RUNPATH=$ORIGIN/../lib（libssl.so.1.1 依赖解析靠它），
+#          副本在 /usr/lib64 时 $ORIGIN 解析错误 → 用 patchelf 给 _psycopg.so 设 RUNPATH
+#          指向 Kingbase lib 原始位置，让 psycopg2 从原始位置加载 libpq。
 RUN set -ex && \
     if [ "$(uname -m)" = "aarch64" ]; then \
         yum install -y postgresql-devel; \
     fi && \
     if [ "$(uname -m)" = "aarch64" ]; then \
-        pip3 install --no-cache-dir "psycopg2==2.9.8"; \
+        cp -f /home/kingbase/install/kingbase/lib/libpq.so.5.12 /usr/lib64/libpq.so.5 && \
+        pip3 install --no-cache-dir "psycopg2==2.9.8" && \
+        pip3 install --no-cache-dir patchelf && \
+        patchelf --set-rpath /home/kingbase/install/kingbase/lib \
+            /usr/local/lib64/python3.6/site-packages/psycopg2/_psycopg*.so; \
     else \
         pip3 install --no-cache-dir "psycopg2-binary"; \
     fi && \
@@ -93,10 +110,6 @@ RUN set -ex && \
     python-dateutil \
     psutil \
     PyYAML
-
-# ---------- 从旧镜像拷贝 Kingbase ----------
-COPY --from=kingbase /home/kingbase/install/kingbase /home/kingbase/install/kingbase
-COPY --from=kingbase /home/kingbase/docker-entrypoint.sh /home/kingbase/docker-entrypoint.sh
 
 # ---------- HAProxy + confd 模板 ----------
 RUN mkdir -p /etc/haproxy
