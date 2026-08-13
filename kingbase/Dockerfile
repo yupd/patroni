@@ -75,8 +75,20 @@ RUN set -ex && \
     mkdir -p /etc/confd/conf.d /etc/confd/templates
 
 # ---------- Patroni + 依赖 ----------
-RUN pip3 install --no-cache-dir \
-    "psycopg2-binary" \
+# psycopg2 安装策略按架构：
+#   amd64: psycopg2-binary 有 wheel ✅
+#   arm64: psycopg2-binary 无 cp36+aarch64 wheel（实测 pip 21.3.1 仅 sdist），
+#          源码编译（需要 pg_config，由 postgresql-devel 提供）
+RUN set -ex && \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+        yum install -y postgresql-devel; \
+    fi && \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+        pip3 install --no-cache-dir "psycopg2==2.9.8"; \
+    else \
+        pip3 install --no-cache-dir "psycopg2-binary"; \
+    fi && \
+    pip3 install --no-cache-dir \
     "patroni[etcd]" \
     python-dateutil \
     psutil \
