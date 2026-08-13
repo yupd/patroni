@@ -62,16 +62,29 @@ RUN set -ex && \
     etcd --version
 
 # ---------- confd 0.16.0 ----------
+# amd64: 官方 release 二进制（UPX 压缩，x86 上无问题）
+# arm64: 官方 arm64 release 是 UPX 压缩的静态二进制，在 aarch64 真机上 exec 失败
+#        （实测 rc=127；构建机 QEMU 模拟下反而能跑，所以构建期验证发现不了）
+#        → arm64 分支在镜像内用 Go 工具链源码编译非 UPX 版（对齐 PG 官方镜像做法）
 RUN set -ex && \
     ARCH=$(uname -m) && \
-    case "$ARCH" in \
-        x86_64)  CONFD_ARCH="amd64" ;; \
-        aarch64) CONFD_ARCH="arm64" ;; \
-        *)       CONFD_ARCH="amd64" ;; \
-    esac && \
-    curl -sL "https://github.com/kelseyhightower/confd/releases/download/v${CONFDVERSION}/confd-${CONFDVERSION}-linux-${CONFD_ARCH}" \
-        -o /usr/local/bin/confd && \
-    chmod +x /usr/local/bin/confd && \
+    if [ "$ARCH" = "aarch64" ]; then \
+        yum install -y git make && \
+        curl -sL https://mirrors.aliyun.com/golang/go1.20.4.linux-arm64.tar.gz | tar xz -C /usr/local go && \
+        export GOROOT=/usr/local/go && export PATH=$PATH:$GOROOT/bin && \
+        # 注意：clone 默认分支（master，go.mod 时代）——v0.16.0 tag 是 dep 时代
+        # （只有 Gopkg.lock 无 go.mod，go build 会报 cannot find main module）
+        git clone --recurse-submodules https://github.com/kelseyhightower/confd.git /confd && \
+        make -C /confd && \
+        cp /confd/bin/confd /usr/local/bin/confd && \
+        chmod +x /usr/local/bin/confd && \
+        rm -rf /confd /usr/local/go; \
+    else \
+        CONFD_ARCH="amd64"; \
+        curl -sL "https://github.com/kelseyhightower/confd/releases/download/v${CONFDVERSION}/confd-${CONFDVERSION}-linux-${CONFD_ARCH}" \
+            -o /usr/local/bin/confd && \
+        chmod +x /usr/local/bin/confd; \
+    fi && \
     mkdir -p /etc/confd/conf.d /etc/confd/templates
 
 # ---------- 从旧镜像拷贝 Kingbase ----------

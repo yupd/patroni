@@ -10,10 +10,11 @@ readonly DOCKER_IP
 
 case "$1" in
     haproxy)
-        # 容器以非 root 用户运行，需确保 pidfile 目录可写（sudo 免密已配置）
+        # 容器以非 root 用户运行，需确保 pidfile 目录与 confd 渲染目标可写（sudo 免密已配置）
+        # 注意：confd 在目标目录写临时文件再原子 rename，需要的是目录写权限
         sudo mkdir -p /var/run/haproxy 2>/dev/null || true
         sudo chmod 777 /var/run/haproxy 2>/dev/null || true
-        haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy/haproxy.pid -D
+        sudo chmod 777 /etc/haproxy 2>/dev/null || true
         # 注意：不能 set -- confd ...（位置参数会导致 Go flag 解析停止，
         # -node/-prefix 等全部失效，confd 回退默认 127.0.0.1:4001）
         set -- "-prefix=$PATRONI_NAMESPACE/$PATRONI_SCOPE" -interval=10 -backend
@@ -35,6 +36,14 @@ case "$1" in
 $(echo "$ETCDCTL_ENDPOINTS" | sed 's/,/\n/g')
 EOT
         fi
+        # 先用 onetime 模式渲染配置（模板 bind 端口来自 HAPROXY_PRIMARY_PORT /
+        # HAPROXY_REPLICA_PORT / HAPROXY_STATS_PORT 环境变量，默认 5000/5001/7000），
+        # 再启动 haproxy——否则直接用构建时的静态配置启动会绑定默认端口，
+        # 在 5000 等端口被其他服务占用时报 cannot bind socket
+        if ! confd -onetime "$@" 2>/dev/null; then
+            echo "WARNING: confd onetime render failed, haproxy will use static config"
+        fi
+        haproxy -f /etc/haproxy/haproxy.cfg -p /var/run/haproxy/haproxy.pid -D
         exec confd "$@"
         ;;
     etcd)
