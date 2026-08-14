@@ -16,6 +16,10 @@ ARG LC_ALL
 ARG LANG
 
 ENV ETCDVERSION=3.3.13 CONFDVERSION=0.16.0
+# etcd 3.3.x 的 arm64 构建是实验性的，运行需 ETCD_UNSUPPORTED_ARCH=arm64
+# （TARGETARCH 由 buildx --platform 注入；普通 docker build 无此变量 → 空值 → x86 不受影响）
+ARG TARGETARCH
+ENV ETCD_UNSUPPORTED_ARCH=${TARGETARCH}
 
 RUN set -ex \
     && export DEBIAN_FRONTEND=noninteractive \
@@ -148,6 +152,9 @@ ARG PGBIN=/usr/lib/postgresql/$PG_MAJOR/bin
 ENV LC_ALL=$LC_ALL LANG=$LANG EDITOR=/usr/bin/editor
 ENV PGDATA=$PGDATA PATH=$PATH:$PGBIN
 ENV ETCDCTL_API=3
+# 最终阶段必须重复声明（ENV 不随 COPY --from 传递）；x86 构建时为空值无影响
+ARG TARGETARCH
+ENV ETCD_UNSUPPORTED_ARCH=${TARGETARCH}
 
 COPY patroni /patroni/
 COPY extras/confd/conf.d/haproxy.toml /etc/confd/conf.d/
